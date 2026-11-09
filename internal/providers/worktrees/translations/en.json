@@ -1,0 +1,12 @@
+{
+  "worktrees.name": "Worktrees",
+  "worktrees.process_running": "A program started from this worktree is running ({{.Process}}), for example a dev server or a Gradle daemon. Stop it first.",
+  "worktrees.artifacts.title": "Dependencies and builds in worktrees",
+  "worktrees.artifacts.what": "node_modules, Pods, build and similar folders inside extra git worktrees, for example the ones Claude Code sessions create in .claude/worktrees.",
+  "worktrees.artifacts.why": "Only folders that git ignores are listed, so your code and commits are not touched. Folders used by a running process (a dev server started from that worktree) can't be selected.",
+  "worktrees.artifacts.after": "Before working in that worktree again, run npm install, pod install or a build to recreate them.",
+  "worktrees.builds.title": "Leftover builds",
+  "worktrees.builds.what": "Finished app builds lying next to the code: .xcarchive, .ipa, .apk, .aab, .dmg, .app and installers that git does not track.",
+  "worktrees.builds.why": "They are build results, not source code, and can be built again from the project.",
+  "worktrees.builds.after": "For an .xcarchive of a version that is live in the App Store, crash reports can no longer be symbolicated on this Mac — keep those."
+}

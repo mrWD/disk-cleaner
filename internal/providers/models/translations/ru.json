@@ -1,0 +1,31 @@
+{
+  "models.name": "AI-модели",
+  "models.loaded": "Модель сейчас загружена в {{.App}}. Сначала выгрузите её или закройте {{.App}}.",
+  "models.app_running": "{{.App}} запущено и может использовать эту модель. Сначала закройте {{.App}}.",
+  "models.llmstore": "Управляется llmstore. LM Studio, Ollama и ваши приложения используют клоны APFS этого файла, поэтому удаление здесь почти ничего не освободит. Удаляйте через llmstore.",
+
+  "models.lmstudio.title": "LM Studio",
+  "models.lmstudio.what": "Модели, скачанные во вкладке Discover в LM Studio.",
+  "models.lmstudio.why": "Любую модель можно скачать в LM Studio снова. Больше от этих файлов ничего не зависит.",
+  "models.lmstudio.after": "Модель пропадёт из списка LM Studio; скачивать её снова — долго и тяжело (часто несколько ГБ).",
+
+  "models.ollama.title": "Ollama",
+  "models.ollama.what": "Модели, скачанные через ollama pull или ollama run. Показан размер, который освободится: слои, общие с другими моделями, останутся.",
+  "models.ollama.why": "Любую модель можно скачать снова через ollama pull. Модели, загруженные прямо сейчас, выбрать нельзя.",
+  "models.ollama.after": "ollama run скачает модель заново при следующем использовании.",
+
+  "models.huggingface.title": "Кэш Hugging Face",
+  "models.huggingface.what": "Модели и наборы данных, которые Python-библиотеки (transformers, sentence-transformers, diffusers) скачали с Hugging Face.",
+  "models.huggingface.why": "Библиотеки скачают их снова сами, когда код к ним обратится.",
+  "models.huggingface.after": "Следующий запуск скрипта с этой моделью сначала её скачает, а без интернета до этого работать не будет.",
+
+  "models.apps.title": "Модели, скачанные приложениями",
+  "models.apps.what": "Модели, которые приложения хранят в своих папках: например языковые и голосовые модели Lingary или языки Argos Translate.",
+  "models.apps.why": "Эти приложения скачают модель снова, когда она понадобится. Модели запущенного приложения выбрать нельзя.",
+  "models.apps.after": "Приложение предложит скачать модель снова или скачает её при первом использовании. Функции, которым она нужна, до этого не работают без интернета.",
+
+  "models.llmstore.title": "llmstore",
+  "models.llmstore.what": "Общее хранилище моделей llmstore в ~/Library/Models: одна копия весов, клонированная в LM Studio, Ollama и приложения.",
+  "models.llmstore.why": "Показано для справки: удаление файла хранилища не освобождает место, пока живы его клоны.",
+  "models.llmstore.after": "Чтобы удалить модель отовсюду сразу, используйте llmstore."
+}

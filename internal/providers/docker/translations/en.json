@@ -1,0 +1,27 @@
+{
+  "docker.name": "Docker",
+  "docker.not_installed": "Docker is not installed.",
+  "docker.not_running": "Docker is not running. Start Docker Desktop and scan again.",
+  "docker.image_used": "Used by {{.Count}} container(s). Remove those containers first.",
+  "docker.volume_attached": "Attached to {{.Count}} container(s). Remove those containers first.",
+
+  "docker.containers.title": "Containers",
+  "docker.containers.what": "Containers that have been created on this Mac, running or stopped.",
+  "docker.containers.why": "A stopped container is usually leftover from an old docker run. Running containers can't be selected.",
+  "docker.containers.after": "Files written inside the container (not into a volume) are lost. The image stays and can start a new container.",
+
+  "docker.images.title": "Images",
+  "docker.images.what": "Downloaded or built container images. The size shown is what deleting frees: layers shared with other images stay.",
+  "docker.images.why": "Images can be pulled or built again. Images used by any container can't be selected.",
+  "docker.images.after": "The next docker run or compose up downloads or rebuilds the image.",
+
+  "docker.volumes.title": "Volumes",
+  "docker.volumes.what": "Storage that containers keep between restarts, often databases.",
+  "docker.volumes.why": "Volumes not attached to any container are usually left from removed projects. Attached volumes can't be selected.",
+  "docker.volumes.after": "Data in the volume is lost for good. Check that it isn't a database you still need.",
+
+  "docker.build_cache.title": "Build cache",
+  "docker.build_cache.what": "Intermediate layers saved by docker build to speed up the next build.",
+  "docker.build_cache.why": "Only cache that no build is using right now is removed. Docker recreates it.",
+  "docker.build_cache.after": "The next docker build of each image runs all steps from scratch."
+}

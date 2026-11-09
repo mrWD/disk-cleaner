@@ -1,0 +1,24 @@
+{
+  "android.name": "Android",
+  "android.used_by_emulator": "Used by the emulator {{.Emulator}}. Delete the emulator first if you don't need it.",
+
+  "android.avds.title": "Emulators",
+  "android.avds.what": "Android Virtual Devices from Android Studio's Device Manager, with the apps and data installed on them.",
+  "android.avds.why": "An emulator can be created again in Device Manager. Running emulators can't be selected.",
+  "android.avds.after": "Apps and data inside the emulator are lost.",
+
+  "android.system_images.title": "System images",
+  "android.system_images.what": "Android versions that emulators boot from, about 2–4 GB each.",
+  "android.system_images.why": "Images that no emulator uses can be downloaded again in Android Studio › SDK Manager. Images used by an emulator can't be selected.",
+  "android.system_images.after": "To create an emulator with this Android version you'll need to download the image again.",
+
+  "android.ndk.title": "NDK versions",
+  "android.ndk.what": "Native Development Kit versions used to compile C/C++ code in Android and React Native projects.",
+  "android.ndk.why": "Gradle downloads the NDK version a project asks for (ndkVersion) automatically when it's missing.",
+  "android.ndk.after": "The next build of a project that needs this version will download it first.",
+
+  "android.sources.title": "SDK sources",
+  "android.sources.what": "The Java and Kotlin source code of Android itself, so the editor can show it when you open a class like Activity.",
+  "android.sources.why": "Builds don't use it. Android Studio offers to download it again when you open a class without sources.",
+  "android.sources.after": "Opening an Android class shows decompiled code until you download the sources again."
+}

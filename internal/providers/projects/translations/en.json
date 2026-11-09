@@ -1,0 +1,16 @@
+{
+  "projects.name": "Projects",
+  "projects.process_running": "A program started from this project is running ({{.Process}}), for example a dev server or a Gradle daemon. Stop it first.",
+  "projects.inactive.title": "Inactive projects",
+  "projects.inactive.what": "node_modules, Pods, build, .venv and similar folders in git repositories without commits for more than 30 days.",
+  "projects.inactive.why": "Only folders that git ignores are listed, so your code and commits are not touched. They are recreated by npm install, pod install or a build.",
+  "projects.inactive.after": "When you come back to the project, install dependencies or build it again first.",
+  "projects.active.title": "Active projects",
+  "projects.active.what": "The same folders in repositories you committed to in the last 30 days.",
+  "projects.active.why": "They can be recreated too, but you are probably still working on these projects.",
+  "projects.active.after": "You will need to install dependencies or rebuild before the next run, which takes time.",
+  "projects.builds.title": "Leftover builds",
+  "projects.builds.what": "Finished app builds lying next to the code: .xcarchive, .ipa, .apk, .aab, .dmg, .app and installers that git does not track.",
+  "projects.builds.why": "They are build results, not source code, and can be built again from the project.",
+  "projects.builds.after": "For an .xcarchive of a version that is live in the App Store, crash reports can no longer be symbolicated on this Mac — keep those."
+}

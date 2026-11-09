@@ -1,0 +1,12 @@
+{
+  "worktrees.name": "Worktree",
+  "worktrees.process_running": "Работает программа, запущенная из этого worktree ({{.Process}}), например dev-сервер или демон Gradle. Сначала остановите её.",
+  "worktrees.artifacts.title": "Зависимости и сборки в worktree",
+  "worktrees.artifacts.what": "node_modules, Pods, build и похожие папки внутри дополнительных git worktree, например тех, что создают сессии Claude Code в .claude/worktrees.",
+  "worktrees.artifacts.why": "Показываются только папки, которые git игнорирует, поэтому ваш код и коммиты не затрагиваются. Папки, которые использует запущенный процесс (dev-сервер из этого worktree), выбрать нельзя.",
+  "worktrees.artifacts.after": "Прежде чем снова работать в этом worktree, выполните npm install, pod install или сборку, чтобы их восстановить.",
+  "worktrees.builds.title": "Оставленные сборки",
+  "worktrees.builds.what": "Готовые сборки приложений рядом с кодом: .xcarchive, .ipa, .apk, .aab, .dmg, .app и установщики, которые git не отслеживает.",
+  "worktrees.builds.why": "Это результаты сборки, а не исходный код, их можно собрать из проекта снова.",
+  "worktrees.builds.after": "Если это .xcarchive версии, которая сейчас в App Store, расшифровать её отчёты о сбоях на этом Mac будет нельзя — такие лучше оставить."
+}

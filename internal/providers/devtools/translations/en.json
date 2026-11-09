@@ -1,0 +1,32 @@
+{
+  "devtools.name": "Developer tools",
+  "devtools.running": "{{.App}} is running and uses these files. Quit {{.App}} first.",
+  "devtools.version_running": "This version of {{.App}} is running right now. Restart {{.App}} so it switches to the current version.",
+  "devtools.claude_app": "Claude manages this folder itself; deleting parts of it can lose sessions. Clean it in Claude › Settings › This computer › Storage.",
+  "devtools.claude_history": "Conversation history of Claude Code. To remove old sessions automatically, set cleanupPeriodDays in ~/.claude/settings.json.",
+
+  "devtools.leftovers.title": "Leftovers of uninstalled apps",
+  "devtools.leftovers.what": "Extensions, settings, caches and data of editors and tools that are no longer on this Mac — for example VS Code or IntelliJ IDEA moved to the Trash.",
+  "devtools.leftovers.why": "The app itself is gone, so nothing uses these files.",
+  "devtools.leftovers.after": "If you install the app again, it starts with default settings and without extensions.",
+
+  "devtools.old_versions.title": "Old versions",
+  "devtools.old_versions.what": "Previous versions kept after updates: Claude Code and Cursor CLI builds, old extension versions, settings folders of previous JetBrains and Android Studio versions.",
+  "devtools.old_versions.why": "The current version doesn't use them. A version that is still running can't be selected.",
+  "devtools.old_versions.after": "Nothing changes for the current version.",
+
+  "devtools.caches.title": "Caches and temporary files",
+  "devtools.caches.what": "Web caches, compiled code of previous app versions, extension installers, logs and temporary files of editors and AI tools.",
+  "devtools.caches.why": "Apps recreate them. Settings, chats and project state are in other folders and are not touched. Caches of running apps can't be selected.",
+  "devtools.caches.after": "The first start after cleaning is a little slower.",
+
+  "devtools.runtimes.title": "Downloaded runtimes",
+  "devtools.runtimes.what": "Tools that AI apps download to work with files on your Mac, for example the Codex runtime with Node.js and LibreOffice.",
+  "devtools.runtimes.why": "The app downloads the runtime again when it needs it.",
+  "devtools.runtimes.after": "The next task that needs it waits for a download of 1–2 GB.",
+
+  "devtools.info.title": "Cleaned inside the app",
+  "devtools.info.what": "Data that these apps manage themselves: shown here so you can see how much space it takes.",
+  "devtools.info.why": "Deleting it from outside can break the app or lose your history, so it can't be selected here.",
+  "devtools.info.after": "Use the place mentioned in each line to clean it the right way."
+}

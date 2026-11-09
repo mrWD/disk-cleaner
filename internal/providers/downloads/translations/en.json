@@ -1,0 +1,20 @@
+{
+  "downloads.name": "Downloads",
+  "downloads.no_access": "Disk Cleaner can't read Downloads yet. Allow it in System Settings › Privacy & Security › Files and Folders › Disk Cleaner › Downloads Folder, then rescan.",
+  "downloads.mounted": "This disk image is mounted. Eject it in Finder first.",
+
+  "downloads.installers.title": "Installers",
+  "downloads.installers.what": "Disk images and packages (.dmg, .pkg) you downloaded to install apps.",
+  "downloads.installers.why": "Once an app is installed, its installer isn't needed; it can be downloaded again from the developer's site. Mounted images can't be selected.",
+  "downloads.installers.after": "Files are moved to the Trash, so you can still bring them back. Space is freed when you empty the Trash.",
+
+  "downloads.builds.title": "App builds",
+  "downloads.builds.what": "Builds of apps: .aab and .apk for Google Play, .ipa and .xcarchive for the App Store, .app bundles.",
+  "downloads.builds.why": "A build that is already uploaded to the store is kept there, and every build can be made again from the project.",
+  "downloads.builds.after": "Files are moved to the Trash. Keep builds you still have to upload, and .xcarchive of versions that are live in the App Store.",
+
+  "downloads.archives.title": "Archives",
+  "downloads.archives.what": "Downloaded archives: .zip, .xip (for example Xcode), .tar.gz, .7z, .rar.",
+  "downloads.archives.why": "Usually an archive has already been unpacked or its contents installed.",
+  "downloads.archives.after": "Files are moved to the Trash. Check that you don't keep the only copy of something inside."
+}

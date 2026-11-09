@@ -1,0 +1,31 @@
+{
+  "models.name": "AI models",
+  "models.loaded": "{{.App}} has this model loaded right now. Unload it or quit {{.App}} first.",
+  "models.app_running": "{{.App}} is running and may be using this model. Quit {{.App}} first.",
+  "models.llmstore": "Managed by llmstore. LM Studio, Ollama and your apps use APFS clones of this file, so deleting it here frees almost nothing. Remove it with llmstore.",
+
+  "models.lmstudio.title": "LM Studio",
+  "models.lmstudio.what": "Models downloaded in LM Studio's Discover tab.",
+  "models.lmstudio.why": "Every model can be downloaded again from LM Studio. Nothing else depends on these files.",
+  "models.lmstudio.after": "The model disappears from LM Studio's list; downloading it again takes time and bandwidth (often several GB).",
+
+  "models.ollama.title": "Ollama",
+  "models.ollama.what": "Models pulled with ollama pull or ollama run. Size shown is what deleting frees: layers shared with other models stay.",
+  "models.ollama.why": "Any model can be pulled again with ollama pull. Models loaded right now can't be selected.",
+  "models.ollama.after": "ollama run will download the model again the next time you use it.",
+
+  "models.huggingface.title": "Hugging Face cache",
+  "models.huggingface.what": "Models and datasets that Python libraries (transformers, sentence-transformers, diffusers) downloaded from Hugging Face.",
+  "models.huggingface.why": "Libraries download them again automatically the next time code asks for them.",
+  "models.huggingface.after": "The next run of a script that uses the model downloads it first, and won't work offline until then.",
+
+  "models.apps.title": "Models downloaded by apps",
+  "models.apps.what": "Models that apps keep in their own folders: for example language and voice models of Lingary or Argos Translate languages.",
+  "models.apps.why": "These apps download a model again when they need it. Models of a running app can't be selected.",
+  "models.apps.after": "The app asks to download the model again or downloads it on first use. Features that need it don't work offline until then.",
+
+  "models.llmstore.title": "llmstore",
+  "models.llmstore.what": "The shared model store of llmstore in ~/Library/Models: one copy of the weights, cloned into LM Studio, Ollama and apps.",
+  "models.llmstore.why": "Shown for information only: deleting a store file doesn't free space while its clones exist.",
+  "models.llmstore.after": "Use llmstore to remove a model everywhere at once."
+}

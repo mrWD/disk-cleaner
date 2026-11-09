@@ -1,0 +1,19 @@
+{
+  "appcaches.name": "App caches & logs",
+  "appcaches.running": "{{.App}} is running and uses this cache. Quit {{.App}} first.",
+
+  "appcaches.caches.title": "App caches",
+  "appcaches.caches.what": "Files that apps keep to work faster: downloaded pages and images, compiled shaders, temporary data. Apple's system caches are not listed.",
+  "appcaches.caches.why": "An app recreates its cache when needed. Caches of running apps can't be selected.",
+  "appcaches.caches.after": "The first start of the app and the first pages it opens are a bit slower.",
+
+  "appcaches.updates.title": "Update leftovers",
+  "appcaches.updates.what": "Downloaded updates that apps (Cursor, VS Code and other Electron apps) keep after installing them.",
+  "appcaches.updates.why": "The update is already installed; these copies are not used anymore.",
+  "appcaches.updates.after": "Nothing changes. The next update is downloaded again as usual.",
+
+  "appcaches.logs.title": "Logs",
+  "appcaches.logs.what": "Logs and crash reports that apps write to ~/Library/Logs.",
+  "appcaches.logs.why": "They are only needed to investigate a problem that is happening right now.",
+  "appcaches.logs.after": "Old logs are gone; apps start writing new ones."
+}

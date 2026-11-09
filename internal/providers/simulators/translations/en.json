@@ -1,0 +1,24 @@
+{
+  "simulators.name": "Simulators",
+  "simulators.no_xcode": "Xcode command line tools are not available, so simulators can't be listed.",
+  "simulators.shared_image": "{{.Count}} runtime entries share one disk image. Deleting this one deletes the image for all of them.",
+  "simulators.newest_runtime": "{{.Runtime}} is the newest runtime of its platform. Xcode needs it to run simulators.",
+  "simulators.not_deletable": "macOS marks this runtime as not deletable.",
+  "simulators.device_booted": "The simulator {{.Device}} is running on this version. Shut it down first.",
+  "simulators.runtime_missing": "Its OS runtime is not found right now. It may come back after a restart; deleting would lose the simulator and its data.",
+
+  "simulators.runtimes.title": "Simulator runtimes",
+  "simulators.runtimes.what": "Disk images with an iOS, watchOS, tvOS or visionOS version that simulators run on. Each one is 7–9 GB.",
+  "simulators.runtimes.why": "Older versions are only needed to test on that exact OS version. They can be downloaded again in Xcode › Settings › Components.",
+  "simulators.runtimes.after": "Simulators on this version stop working until you download it again.",
+
+  "simulators.devices.title": "Simulators",
+  "simulators.devices.what": "Simulated iPhones, iPads and other devices with the apps and data installed on them.",
+  "simulators.devices.why": "A simulator can be created again in a minute. Running simulators can't be selected.",
+  "simulators.devices.after": "Apps installed on the simulator and their data are lost. Build and run your app again to reinstall it.",
+
+  "simulators.dyld_cache.title": "Simulator dyld cache",
+  "simulators.dyld_cache.what": "Prepared system libraries that make simulators start faster, one set per runtime.",
+  "simulators.dyld_cache.why": "macOS rebuilds the cache the next time a simulator of that version starts. Caches of deleted runtimes are useless.",
+  "simulators.dyld_cache.after": "The first start of a simulator takes a few minutes longer. Deleting asks for the administrator password."
+}

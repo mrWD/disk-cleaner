@@ -1,0 +1,24 @@
+{
+  "android.name": "Android",
+  "android.used_by_emulator": "Используется эмулятором {{.Emulator}}. Если эмулятор не нужен, сначала удалите его.",
+
+  "android.avds.title": "Эмуляторы",
+  "android.avds.what": "Виртуальные устройства Android из Device Manager в Android Studio, с установленными на них приложениями и данными.",
+  "android.avds.why": "Эмулятор можно создать заново в Device Manager. Запущенные эмуляторы выбрать нельзя.",
+  "android.avds.after": "Приложения и данные внутри эмулятора пропадут.",
+
+  "android.system_images.title": "Системные образы",
+  "android.system_images.what": "Версии Android, с которых загружаются эмуляторы, примерно 2–4 ГБ каждая.",
+  "android.system_images.why": "Образы, которые не использует ни один эмулятор, можно скачать снова в Android Studio › SDK Manager. Образы, которые использует эмулятор, выбрать нельзя.",
+  "android.system_images.after": "Чтобы создать эмулятор с этой версией Android, образ придётся скачать снова.",
+
+  "android.ndk.title": "Версии NDK",
+  "android.ndk.what": "Версии Native Development Kit для компиляции C/C++ в проектах на Android и React Native.",
+  "android.ndk.why": "Если нужной проекту версии (ndkVersion) нет, Gradle скачает её сам.",
+  "android.ndk.after": "Следующая сборка проекта, которому нужна эта версия, сначала её скачает.",
+
+  "android.sources.title": "Исходники SDK",
+  "android.sources.what": "Исходный код самого Android на Java и Kotlin — редактор показывает его, когда вы открываете класс вроде Activity.",
+  "android.sources.why": "Сборка их не использует. Android Studio сама предложит скачать их снова, если открыть класс без исходников.",
+  "android.sources.after": "Пока исходники не скачаны снова, вместо кода класса Android будет показан декомпилированный."
+}

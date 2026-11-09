@@ -1,0 +1,28 @@
+{
+  "xcode.name": "Xcode",
+
+  "xcode.derived_data.title": "Derived Data",
+  "xcode.derived_data.what": "Build products, indexes and intermediate files that Xcode keeps for every project you have opened.",
+  "xcode.derived_data.why": "Xcode recreates everything here on the next build. Your code and project settings are not stored in this folder.",
+  "xcode.derived_data.after": "The next build and indexing of each project will take longer than usual.",
+
+  "xcode.archives.title": "Archives",
+  "xcode.archives.what": "Builds made with Product › Archive, together with their debug symbols (dSYM).",
+  "xcode.archives.why": "Old archives are only needed to symbolicate crash reports or to upload that exact build again.",
+  "xcode.archives.after": "Crash reports from deleted builds can no longer be symbolicated on this Mac. Keep archives of versions that are still live in the App Store.",
+
+  "xcode.device_support.title": "Device support files",
+  "xcode.device_support.what": "Debug symbols copied from an iPhone, iPad or Apple Watch for every OS version you have connected.",
+  "xcode.device_support.why": "Xcode copies them again the next time you connect a device with that OS version.",
+  "xcode.device_support.after": "The first connection of such a device takes a few minutes while symbols are copied.",
+
+  "xcode.documentation.title": "Documentation cache",
+  "xcode.documentation.what": "Developer documentation that Xcode downloaded and indexed.",
+  "xcode.documentation.why": "Xcode downloads and indexes the documentation again when you open it.",
+  "xcode.documentation.after": "The first documentation search will be slower.",
+
+  "xcode.previews.title": "SwiftUI previews",
+  "xcode.previews.what": "Builds and simulator data used to render SwiftUI previews.",
+  "xcode.previews.why": "Xcode rebuilds a preview when you open it.",
+  "xcode.previews.after": "The first preview of each view will take longer."
+}
