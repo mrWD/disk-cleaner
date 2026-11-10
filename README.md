@@ -36,7 +36,13 @@ What the script installs if it isn't there yet:
 
 If `git` isn't installed, macOS offers to install the Command Line Tools as soon as you run `git clone`. Accept, then run the commands again.
 
-The first build takes a few minutes. To update later, run `git pull` and `./scripts/build.sh --install` again: the running copy is closed and replaced.
+The first build takes a few minutes.
+
+### Updates
+
+At launch the app asks GitHub whether `main` has commits newer than the one it was built from (Go writes that commit into the app at build time, so there are no version numbers to keep). If it does, a card in the sidebar says so, and **Update…** shows what's new. **Update** opens Terminal in the folder the app was built from, runs `git pull --ff-only` and `./scripts/build.sh --install`; the running copy is closed and the new one opens. If that folder has changes of its own, is on another branch or is gone, the app touches nothing and shows the commands to run by hand. Builds from uncommitted changes or from commits GitHub doesn't have aren't compared, so a developer's own build never nags.
+
+The check is one GET request to `api.github.com`; nothing about you or your Mac is sent. Turn it off in **Settings → Updates**, where **Check Now** checks right away. To update by hand: `git pull` and `./scripts/build.sh --install` in the folder you cloned.
 
 **Try it safely first:** turn on **Settings → Dry run**. The app then shows what it would delete, but doesn't touch anything.
 
@@ -102,6 +108,7 @@ internal/
   i18n/                      translations, language choice
   settings/                  settings (language, project folders, appearance, dry run, Never clean, permissions)
   access/                    checks macOS folder permissions
+  update/                    new versions: GitHub check, install from source
   ui/                        the Fyne window; knows only core
   providers/
     kit/                     shared building blocks for providers

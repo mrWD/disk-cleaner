@@ -21,6 +21,7 @@ import (
 	"disk-cleaner/internal/core"
 	"disk-cleaner/internal/i18n"
 	"disk-cleaner/internal/settings"
+	"disk-cleaner/internal/update"
 )
 
 // keyRe finds strings in the code that look like translation keys: "button.rescan".
@@ -761,5 +762,66 @@ func TestScanAnimation(t *testing.T) {
 			t.Error("animations should stop and be forgotten when the scan ends")
 		}
 		mustShow(t, u, "postgres:17")
+	})
+}
+
+// fakeUpdater — the window's Updater without GitHub or Terminal.
+type fakeUpdater struct {
+	news      update.News
+	err       error
+	installed bool
+}
+
+func (f *fakeUpdater) Version() string                            { return "abc1234" }
+func (f *fakeUpdater) Check(context.Context) (update.News, error) { return f.news, f.err }
+func (f *fakeUpdater) Install(context.Context) error              { f.installed = true; return nil }
+
+func TestUpdates(t *testing.T) {
+	// waitFor gives the background check a moment to come back.
+	waitFor := func(cond func() bool) {
+		deadline := time.Now().Add(2 * time.Second)
+		for !cond() && time.Now().Before(deadline) {
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+
+	t.Run("a new version shows a card that installs it", func(t *testing.T) {
+		// Given: GitHub has two new commits
+		u := loaded(t)
+		fake := &fakeUpdater{news: update.News{Count: 2, Titles: []string{"Lock button", "Scan view"}}}
+		u.opts.Updater = fake
+
+		// When: the launch check runs
+		u.checkForUpdates()
+		waitFor(func() bool { return u.news.Count == 2 })
+
+		// Then: the sidebar card says so
+		if card := strings.Join(texts(u.updateBox), "\n"); !strings.Contains(card, "New version available") || !strings.Contains(card, "2 changes on GitHub") {
+			t.Errorf("update card shows:\n%s", card)
+		}
+
+		// When: Update in the update window
+		u.installUpdate()
+
+		// Then: the install started and the card says it's running
+		if !fake.installed || !strings.Contains(strings.Join(texts(u.updateBox), "\n"), "Updating in Terminal") {
+			t.Error("install should start and the card should say it's running in Terminal")
+		}
+	})
+
+	t.Run("no check when it's turned off, no card when the check fails", func(t *testing.T) {
+		u := loaded(t)
+		u.opts.Updater = &fakeUpdater{news: update.News{Count: 3}}
+		u.opts.Settings.SetCheckUpdates(false)
+		u.checkForUpdates()
+
+		u2 := loaded(t)
+		u2.opts.Updater = &fakeUpdater{err: update.ErrUnknownBuild}
+		u2.checkForUpdates()
+
+		time.Sleep(100 * time.Millisecond)
+		if u.news.Count != 0 || len(u.updateBox.Objects) != 0 || len(u2.updateBox.Objects) != 0 {
+			t.Error("no card is expected")
+		}
 	})
 }

@@ -40,6 +40,7 @@ import (
 	"disk-cleaner/internal/providers/worktrees"
 	"disk-cleaner/internal/providers/xcode"
 	"disk-cleaner/internal/settings"
+	"disk-cleaner/internal/update"
 )
 
 var (
@@ -210,6 +211,22 @@ func TestScreenshots(t *testing.T) {
 			break
 		}
 	}
+
+	// A new version: the card in the sidebar and the update window, with a
+	// fake GitHub that has three new commits.
+	u.opts.Updater = &fakeUpdater{news: update.News{Count: 3, Titles: []string{
+		"Scan view in the middle of the free space",
+		"Scan view: ring of dots until something is found, then live progress",
+		"Lock button on each row for Never clean",
+	}}}
+	u.news = update.News{Count: 3, Titles: u.opts.Updater.(*fakeUpdater).news.Titles}
+	u.fillUpdate()
+	save("update-card")
+	u.showUpdate()
+	save("update")
+	u.win.Canvas().Overlays().Remove(u.win.Canvas().Overlays().Top())
+	u.news = update.News{}
+	u.fillUpdate()
 
 	// Settings scrolled to the end: the scrollbar and shadows run edge to edge.
 	u.showSettings()

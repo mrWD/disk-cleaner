@@ -4,6 +4,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -80,10 +81,21 @@ func (u *App) showSettings() {
 	// --- Permissions: switches with explanations (permissions.go) ---
 	permissions, savePermissions := u.permissionsSection()
 
-	// --- About: version, the project page and the source code ---
+	// --- Updates: check at launch, Check Now (updates.go) ---
+	var updates fyne.CanvasObject
+	var checkUpdates *widget.Check
+	if u.opts.Updater != nil {
+		updates, checkUpdates = u.updatesSection()
+	}
+
+	// --- About: version (with the commit it was built from), project page, source ---
 	about := container.NewHBox()
-	if v := u.app.Metadata().Version; v != "" { // empty in tests and with go run
-		about.Add(widget.NewLabel(u.t("settings.version", map[string]any{"Version": v})))
+	version := u.app.Metadata().Version // empty in tests and with go run
+	if u.opts.Updater != nil && u.opts.Updater.Version() != "" {
+		version = strings.TrimSpace(version + " (" + u.opts.Updater.Version() + ")")
+	}
+	if version != "" {
+		about.Add(widget.NewLabel(u.t("settings.version", map[string]any{"Version": version})))
 	}
 	about.Add(webLink("mrwd.github.io", websiteURL))
 	about.Add(webLink("GitHub", sourceURL))
@@ -103,9 +115,12 @@ func (u *App) showSettings() {
 		widget.NewFormItem("", dry),
 		widget.NewFormItem(u.t("settings.never"), neverBox),
 		widget.NewFormItem(u.t("settings.permissions"), permissions),
-		widget.NewFormItem(u.t("settings.about"), about),
-		widget.NewFormItem(u.t("settings.support"), container.NewVBox(supportHint, donate)),
 	)
+	if updates != nil {
+		form.Append(u.t("settings.updates"), updates)
+	}
+	form.AppendItem(widget.NewFormItem(u.t("settings.about"), about))
+	form.AppendItem(widget.NewFormItem(u.t("settings.support"), container.NewVBox(supportHint, donate)))
 
 	// Save applies everything at once; Cancel throws the edits away.
 	apply := func() {
@@ -114,6 +129,9 @@ func (u *App) showSettings() {
 		u.tr.SetLanguage(code)
 		s.SetDryRun(dry.Checked)
 
+		if checkUpdates != nil {
+			s.SetCheckUpdates(checkUpdates.Checked)
+		}
 		u.setAppearance(appearance.selected) // remember and apply
 		downloadsChanged := savePermissions()
 

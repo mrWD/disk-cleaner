@@ -29,6 +29,7 @@ import (
 	"disk-cleaner/internal/providers/xcode"
 	"disk-cleaner/internal/settings"
 	"disk-cleaner/internal/ui"
+	"disk-cleaner/internal/update"
 )
 
 // appID is the app's unique identifier. It is needed so that macOS keeps
@@ -65,6 +66,8 @@ func main() {
 		Settings:  store,
 		// Suggestions for the project folders: folders in ~ with git repositories.
 		FindProjectFolders: func() []string { return gitscan.ProjectFolders(kit.Home()) },
+		// New versions: newer commits on GitHub, installed from source.
+		Updater: update.New(),
 	}); err != nil {
 		log.Fatal(err)
 	}

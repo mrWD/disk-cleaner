@@ -25,6 +25,7 @@ const (
 	keyAllowAdmin       = "allow_admin"
 	keyPermissionsAsked = "permissions_asked"
 	keyRootsConfirmed   = "worktree_roots_confirmed"
+	keyCheckUpdates     = "check_updates"
 )
 
 // Store reads and writes the settings.
@@ -115,3 +116,9 @@ func (s *Store) PermissionsAsked() bool { return s.prefs.Bool(keyPermissionsAske
 
 // SetPermissionsAsked remembers that it was shown.
 func (s *Store) SetPermissionsAsked(done bool) { s.prefs.SetBool(keyPermissionsAsked, done) }
+
+// CheckUpdates — whether to ask GitHub for a newer version at launch (on by default).
+func (s *Store) CheckUpdates() bool { return s.prefs.BoolWithFallback(keyCheckUpdates, true) }
+
+// SetCheckUpdates turns the check on or off.
+func (s *Store) SetCheckUpdates(on bool) { s.prefs.SetBool(keyCheckUpdates, on) }

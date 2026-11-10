@@ -26,6 +26,7 @@ const sidebarWidth = 270
 func (u *App) buildSidebar() fyne.CanvasObject {
 	u.sidebarRows = container.NewVBox()
 	u.disk = container.NewVBox()
+	u.updateBox = container.NewVBox()
 	u.searchEntry = searchField(u.t("search.global"), u.globalQuery, u.setGlobalQuery)
 
 	logo := canvas.NewImageFromResource(fyne.NewStaticResource("appicon.png", appIcon))
@@ -51,6 +52,7 @@ func (u *App) buildSidebar() fyne.CanvasObject {
 	openSettings := widget.NewButtonWithIcon(u.t("button.settings"), theme.SettingsIcon(), u.showSettings)
 	openSettings.Importance = widget.LowImportance
 	footer := container.NewVBox(
+		u.updateBox, // empty unless there's a new version
 		pad(8, 0, 0, 0, u.disk),
 		pad(4, 0, 0, 0, container.NewHBox(rescan, layout.NewSpacer(), openSettings)),
 	)

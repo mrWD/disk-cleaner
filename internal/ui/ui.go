@@ -23,6 +23,7 @@
 //	permissions.go - permissions and the setup window shown before the first scan
 //	folders.go     - editable folder lists: project folders, Add Folder…
 //	sheet.go       - the window-in-the-window used by Settings and the setup
+//	updates.go     - the new-version card, the update window, Settings › Updates
 //	settings.go    - the settings window
 package ui
 
@@ -42,6 +43,7 @@ import (
 	"disk-cleaner/internal/core"
 	"disk-cleaner/internal/i18n"
 	"disk-cleaner/internal/settings"
+	"disk-cleaner/internal/update"
 )
 
 // Texts of the interface itself (buttons, titles) and of the reasons from core.
@@ -63,6 +65,10 @@ type Options struct {
 	// FindProjectFolders suggests project folders (folders in ~ with git
 	// repositories). Optional: without it, the folders are only picked by hand.
 	FindProjectFolders func() []string
+
+	// Updater checks GitHub for a newer version and installs it (updates.go).
+	// Optional: without it there are no update checks.
+	Updater Updater
 }
 
 // providerState is what is known about one provider.
@@ -107,6 +113,9 @@ type App struct {
 
 	// Parts of the window that are rebuilt on changes.
 	banner        *fyne.Container // the "Dry run is on" strip above the right-hand part
+	updateBox     *fyne.Container // the "New version available" card in the sidebar
+	news          update.News     // what GitHub has that this copy doesn't
+	updating      bool            // the update is running in Terminal
 	disk          *fyne.Container // the disk card in the sidebar
 	cleanEvery    *widget.Button  // "Clean All Safe" for all sections (in the disk card)
 	sidebarRows   *fyne.Container
@@ -175,6 +184,7 @@ func New(a fyne.App, opts Options) (*App, error) {
 	} else {
 		u.showSetup()
 	}
+	u.checkForUpdates() // in the background; a card appears if there's a new version
 	return u, nil
 }
 
@@ -218,6 +228,7 @@ func (u *App) render() {
 // refresh updates everything that depends on the providers' state and on the selection.
 func (u *App) refresh() {
 	u.fillBanner()
+	u.fillUpdate()
 	u.fillDisk()
 	u.fillSidebar()
 	u.refreshDetails()

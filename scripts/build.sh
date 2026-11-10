@@ -11,7 +11,9 @@
 #   4. builds the app (fyne package);
 #   5. adds to Info.plist the text that macOS shows when the app asks for
 #      access to Downloads (NSDownloadsFolderUsageDescription);
-#   6. signs the app again (ad-hoc, without a developer certificate):
+#   6. writes the checkout's path into the app (Resources/source-dir.txt),
+#      so the app's update button knows where to run git pull and this script;
+#   7. signs the app again (ad-hoc, without a developer certificate):
 #      after Info.plist is edited, the old signature no longer matches.
 #
 # Run it from any folder:
@@ -101,12 +103,16 @@ if [ ! -x "$FYNE" ]; then
 	FYNE="$GOBIN_DIR/fyne"
 fi
 
-# --- 4–6. Build ---
+# --- 4–7. Build ---
 step "Building $APP (the first build takes a few minutes)"
 "$FYNE" package -os darwin -release
 
 /usr/libexec/PlistBuddy -c "Delete :NSDownloadsFolderUsageDescription" "$PLIST" 2>/dev/null || true
 /usr/libexec/PlistBuddy -c "Add :NSDownloadsFolderUsageDescription string $TEXT" "$PLIST"
+
+# Remember which checkout the app was built from: the app's update button
+# runs git pull and this script again in that folder.
+pwd > "$APP/Contents/Resources/source-dir.txt"
 
 codesign --force --deep --sign - "$APP"
 
