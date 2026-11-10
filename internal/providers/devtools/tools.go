@@ -20,6 +20,16 @@ type tool struct {
 	runtimes []string   // folders where every subfolder is a downloaded runtime
 	versions *versionsT // folder with CLI versions
 	info     []infoT    // for information only: size and where to clean it properly
+
+	// sessions are folders where the tool saves each session or chat; the
+	// newest file there shows when it was last used (for a CLI, which macOS
+	// doesn't track the way it tracks apps).
+	sessions []string
+
+	// history is a folder with one subfolder of chat history per project
+	// (Claude Code's ~/.claude/projects). Each big one gets its own row, with
+	// the project's folder and when it was last worked on; for information only.
+	history string
 }
 
 // versionsT is where a CLI keeps its versions: each version is a file or folder
@@ -58,8 +68,9 @@ var tools = []tool{
 		caches:   []string{caches + "claude-cli-nodejs"},
 		// ~/.claude is settings and history; the Claude app uses it too,
 		// so it never counts as "leftovers".
-		data: []string{".local/share/claude", caches + "claude-cli-nodejs"},
-		info: []infoT{{".claude/projects", reasonClaudeHistory}},
+		data:     []string{".local/share/claude", caches + "claude-cli-nodejs"},
+		sessions: []string{".claude/projects"},
+		history:  ".claude/projects",
 	},
 	{
 		name:     "Codex",
@@ -69,6 +80,7 @@ var tools = []tool{
 		caches:   []string{".codex/.tmp", ".codex/cache", caches + "com.openai.codex"},
 		runtimes: []string{".cache/codex-runtimes"},
 		data:     []string{".codex", ".cache/codex-runtimes", support + "Codex", caches + "com.openai.codex"},
+		sessions: []string{".codex/sessions"},
 	},
 	{
 		name:    "Cursor",

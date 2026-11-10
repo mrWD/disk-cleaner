@@ -7,7 +7,13 @@
 //   - old versions: earlier versions of CLIs, extensions and IDEs;
 //   - caches and temporary files: not touched while the app runs;
 //   - downloaded runtimes (Codex);
-//   - for information only: what is right to clean inside the app itself.
+//   - for information only: what is right to clean inside the app itself,
+//     including Claude Code's chat history, project by project.
+//
+// Every row also says when its tool was last used (core.Item.LastUsed):
+// for an app, the date macOS keeps of when it was last opened; for a CLI,
+// its newest saved session; for leftovers of an uninstalled app, the newest
+// file among them. Something untouched for months is easier to let go.
 package devtools
 
 import (
@@ -15,11 +21,16 @@ import (
 	"context"
 	"embed"
 	"encoding/json"
+	"fmt"
+	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
+	"time"
 
 	"disk-cleaner/internal/core"
 	"disk-cleaner/internal/diskutil"
@@ -50,6 +61,9 @@ type Provider struct {
 	hasCLI    func(name string) bool         // whether the command is installed; a fake in tests
 	processes func(context.Context) []string // list of processes; a fake in tests
 	tools     []tool
+
+	appLastUsed func(app string) time.Time // when an .app was last opened; a fake in tests
+	historyMin  core.Bytes                 // a project's history gets its own row from this size
 }
 
 // New is the provider for the current user.
@@ -62,8 +76,10 @@ func New() *Provider {
 			_, ok := shell.LookPath(name)
 			return ok
 		},
-		processes: kit.Processes,
-		tools:     tools,
+		processes:   kit.Processes,
+		tools:       tools,
+		appLastUsed: spotlightLastUsed,
+		historyMin:  10_000_000,
 	}
 }
 
@@ -92,13 +108,17 @@ type found struct {
 func (p *Provider) Scan(ctx context.Context) ([]core.Item, error) {
 	processes := p.processes(ctx)
 	var all []found
+	var history []core.Item // Claude Code's history: sized separately, see history()
+
+	// used is when the tool being looked at was last used; add puts it on its rows.
+	var used time.Time
 
 	// add remembers a path if it exists.
 	add := func(cat, toolName, label, path string, busy *core.Reason) {
 		if _, err := os.Lstat(path); err != nil {
 			return
 		}
-		it := core.Item{ID: path, CategoryID: cat, Name: toolName + " · " + label, Detail: kit.Tilde(path)}
+		it := core.Item{ID: path, CategoryID: cat, Name: toolName + " · " + label, Detail: kit.Tilde(path), LastUsed: used}
 		if busy != nil {
 			it.Status = core.StatusRunning
 			it.Busy = busy
@@ -108,6 +128,7 @@ func (p *Provider) Scan(ctx context.Context) ([]core.Item, error) {
 
 	for _, t := range p.tools {
 		installed := p.installed(t)
+		used = p.lastUsed(ctx, t)
 		var running *core.Reason
 		if app := runningName(t, processes); app != "" {
 			running = &core.Reason{Key: reasonRunning, Args: map[string]any{"App": app}}
@@ -119,9 +140,12 @@ func (p *Provider) Scan(ctx context.Context) ([]core.Item, error) {
 			if _, err := os.Lstat(path); err == nil {
 				all = append(all, found{path: path, item: core.Item{
 					ID: path, CategoryID: catInfo, Name: t.name + " · " + label(inf.path), Detail: kit.Tilde(path),
-					Protected: &core.Reason{Key: inf.reason},
+					LastUsed: used, Protected: &core.Reason{Key: inf.reason},
 				}})
 			}
+		}
+		if t.history != "" {
+			history = append(history, p.history(ctx, t)...)
 		}
 
 		if !installed {
@@ -186,6 +210,11 @@ func (p *Provider) Scan(ctx context.Context) ([]core.Item, error) {
 			continue
 		}
 		f.item.Size = sizes[i]
+		if f.item.CategoryID == catLeftovers && f.item.LastUsed.IsZero() {
+			// The app is gone, so macOS has no date for it: its newest leftover
+			// file says when it was last used, near enough.
+			f.item.LastUsed = diskutil.NewestFile(ctx, f.path)
+		}
 		if f.item.CategoryID == catRuntimes {
 			if v := bundleVersion(f.path); v != "" {
 				f.item.Detail += " · " + v
@@ -193,6 +222,7 @@ func (p *Provider) Scan(ctx context.Context) ([]core.Item, error) {
 		}
 		items = append(items, f.item)
 	}
+	items = append(items, history...)
 
 	slices.SortStableFunc(items, func(a, b core.Item) int { return cmp.Compare(b.Size, a.Size) })
 	return items, nil
@@ -421,4 +451,144 @@ func bundleVersion(dir string) string {
 		return ""
 	}
 	return r.BundleVersion
+}
+
+// lastUsed — when a tool was last used: the latest of when macOS says its
+// app was last opened and its newest saved session. Zero if neither is known.
+func (p *Provider) lastUsed(ctx context.Context, t tool) time.Time {
+	var last time.Time
+	later := func(when time.Time) {
+		if when.After(last) {
+			last = when
+		}
+	}
+	for _, app := range t.apps {
+		for _, dir := range p.appDirs {
+			if path := filepath.Join(dir, app+".app"); exists(path) && p.appLastUsed != nil {
+				later(p.appLastUsed(path))
+			}
+		}
+	}
+	for _, s := range t.sessions {
+		later(diskutil.NewestFile(ctx, p.abs(s)))
+	}
+	return last
+}
+
+// exists — whether a path exists.
+func exists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+// spotlightLastUsed asks macOS when an app was last opened. Finder shows the
+// same date as "Last opened"; Spotlight keeps it as kMDItemLastUsedDate.
+func spotlightLastUsed(app string) time.Time {
+	out, err := exec.Command("/usr/bin/mdls", "-raw", "-name", "kMDItemLastUsedDate", app).Output()
+	if err != nil {
+		return time.Time{}
+	}
+	t, err := time.Parse("2006-01-02 15:04:05 -0700", strings.TrimSpace(string(out))) // "(null)" fails: zero
+	if err != nil {
+		return time.Time{}
+	}
+	return t
+}
+
+// history — Claude Code's chat history, project by project: one row for each
+// project whose history is at least historyMin, named after the project's
+// folder and dated by its newest session, and one row for all the smaller
+// ones together. For information only: it's the user's own conversations,
+// and Claude Code cleans old ones itself (cleanupPeriodDays in its settings).
+func (p *Provider) history(ctx context.Context, t tool) []core.Item {
+	root := p.abs(t.history)
+	dirs := kit.Subfolders(root)
+	sizes := diskutil.SizeAll(ctx, dirs, kit.Workers())
+	protected := &core.Reason{Key: reasonClaudeHistory}
+
+	var items []core.Item
+	var rest core.Item // the small ones together
+	restCount := 0
+	for i, dir := range dirs {
+		if sizes[i] == 0 {
+			continue
+		}
+		last := diskutil.NewestFile(ctx, dir)
+		if sizes[i] < p.historyMin {
+			restCount++
+			rest.Size += sizes[i]
+			if last.After(rest.LastUsed) {
+				rest.LastUsed = last
+			}
+			continue
+		}
+		items = append(items, core.Item{
+			ID: dir, CategoryID: catInfo, Name: t.name + " · history · " + projectName(dir),
+			Detail: kit.Tilde(dir), Size: sizes[i], LastUsed: last, Protected: protected,
+		})
+	}
+
+	if restCount > 0 {
+		noun := "projects"
+		if restCount == 1 {
+			noun = "project"
+		}
+		rest.ID = root + "#smaller" // an ID of its own: root itself isn't this row
+		rest.CategoryID = catInfo
+		rest.Name = fmt.Sprintf("%s · history · %d more %s", t.name, restCount, noun)
+		rest.Detail = kit.Tilde(root)
+		rest.Protected = protected
+		items = append(items, rest)
+	}
+	return items
+}
+
+// cwdRe finds the folders Claude Code records in its messages:
+// "cwd":"/Users/me/Projects/disk-cleaner".
+var cwdRe = regexp.MustCompile(`"cwd":"((?:[^"\\]|\\.)*)"`)
+
+// encodeRe — the characters Claude Code replaces with "-" when it names a
+// history folder after a project folder: "/Users/me/Projects/a.b" → "-Users-me-Projects-a-b".
+var encodeRe = regexp.MustCompile(`[^a-zA-Z0-9]`)
+
+// projectName — the folder a history belongs to, like "~/Projects/disk-cleaner".
+//
+// The history folder's own name can't be turned back reliably ("-" may have
+// been "/", "." or a real "-"), so it's checked against the folders the
+// sessions mention: the one that gives exactly this name is the project.
+// Matching matters: a session that started in a project can move into one of
+// its worktrees, so the first folder mentioned isn't always the project's.
+// A worktree of a project reads as "~/Projects/app › feature-x".
+func projectName(dir string) string {
+	want := filepath.Base(dir)
+	files, _ := filepath.Glob(filepath.Join(dir, "*.jsonl"))
+	slices.SortFunc(files, func(a, b string) int { return cmp.Compare(modTime(b), modTime(a)) }) // newest first
+	if len(files) > 5 {
+		files = files[:5] // a few sessions are enough to find it
+	}
+
+	for _, file := range files {
+		f, err := os.Open(file)
+		if err != nil {
+			continue
+		}
+		head := make([]byte, 256<<10) // the first lines are enough; a session can be huge
+		n, _ := io.ReadFull(f, head)
+		f.Close()
+		for _, m := range cwdRe.FindAllSubmatch(head[:n], -1) {
+			cwd, err := strconv.Unquote(`"` + string(m[1]) + `"`)
+			if err == nil && encodeRe.ReplaceAllString(cwd, "-") == want {
+				return strings.Replace(kit.Tilde(cwd), "/.claude/worktrees/", " › ", 1)
+			}
+		}
+	}
+	return want
+}
+
+// modTime — when a file was last changed; zero if it can't be read.
+func modTime(path string) int64 {
+	if info, err := os.Stat(path); err == nil {
+		return info.ModTime().UnixNano()
+	}
+	return 0
 }

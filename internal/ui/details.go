@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -418,7 +419,10 @@ func explainRow(icon fyne.Resource, heading, body string) fyne.CanvasObject {
 // an orange label if it can't be selected ("Running", "In use"), and the size.
 // Expanded: the full path and the full reason under the row.
 func (u *App) itemRow(it core.Item, expanded bool) fyne.CanvasObject {
-	check := widget.NewCheck(it.Name, nil)
+	// The checkbox has no text of its own: the name is a separate label next
+	// to it, so a long name can be cut with "…" instead of pushing the row
+	// wider than the window. Clicking the name ticks the box, as before.
+	check := widget.NewCheck("", nil)
 	// Set the state BEFORE assigning OnChanged, so as not to trigger the handler.
 	check.Checked = u.sel.Contains(it)
 	check.OnChanged = func(on bool) {
@@ -439,6 +443,21 @@ func (u *App) itemRow(it core.Item, expanded bool) fyne.CanvasObject {
 		check.Disable()
 	}
 
+	name := widget.NewLabel(it.Name)
+	name.Truncation = fyne.TextTruncateEllipsis
+	if !ok {
+		name.Importance = widget.LowImportance // greyed out, like a disabled checkbox's text
+	}
+	nameTap := newTappable(name, func() {
+		if ok {
+			check.SetChecked(!check.Checked)
+		}
+	})
+	// How wide the name is in full: what a label without truncation reports,
+	// plus a little room — with exactly that width, a truncating label still
+	// cuts the last letters off.
+	nameWidth := widget.NewLabel(it.Name).MinSize().Width + 2*theme.Padding()
+
 	right := container.NewHBox()
 	if !ok {
 		right.Add(pill(u.shortStatus(it), theme.ColorNameWarning))
@@ -446,15 +465,23 @@ func (u *App) itemRow(it core.Item, expanded bool) fyne.CanvasObject {
 	right.Add(container.NewCenter(text(it.Size.String(), theme.SizeNameText, colorSecondary, false)))
 	right.Add(u.lockControl(it)) // Never clean on / off, see never.go
 
-	if !expanded {
-		return container.NewBorder(nil, nil, check, right, pad(0, 0, 6, 6, secondary(it.Detail, false)))
+	// When it was last used goes first, before the path: the path is cut with
+	// "…" when the row is narrow, and the date should stay visible.
+	detail := it.Detail
+	if !it.LastUsed.IsZero() {
+		detail = u.lastUsedText(it.LastUsed, time.Now()) + " · " + detail
 	}
 
-	lines := container.NewVBox(container.NewBorder(nil, nil, check, right))
+	if !expanded {
+		center := container.New(nameDetailLayout{nameWidth: nameWidth}, nameTap, pad(0, 0, 6, 6, secondary(detail, false)))
+		return container.NewBorder(nil, nil, check, right, center)
+	}
+
+	lines := container.NewVBox(container.NewBorder(nil, nil, check, right, nameTap))
 	indent := func(o fyne.CanvasObject) fyne.CanvasObject { return pad(-10, 0, checkIndent, 0, o) }
 
-	if it.Detail != "" {
-		lines.Add(indent(secondary(it.Detail, true)))
+	if detail != "" {
+		lines.Add(indent(secondary(detail, true)))
 	}
 	if !ok {
 		lines.Add(indent(container.NewBorder(nil, nil,
@@ -526,4 +553,52 @@ func setText(t *canvas.Text, s string) {
 		t.Text = s
 		t.Refresh()
 	}
+}
+
+// lastUsedText — when something was last used, as short as it can be said:
+// "last used today", "last used yesterday", "last used Oct 25", and with the
+// year once it's from an earlier year. The date layout comes from the
+// translations (Go writes dates from a sample: "Jan 2" or "02.01").
+func (u *App) lastUsedText(when, now time.Time) string {
+	when = when.In(now.Location())
+	y, m, d := now.Date()
+	today := time.Date(y, m, d, 0, 0, 0, 0, now.Location())
+
+	var day string
+	switch {
+	case !when.Before(today):
+		day = u.t("lastused.today")
+	case !when.Before(today.AddDate(0, 0, -1)):
+		day = u.t("lastused.yesterday")
+	case when.Year() == y:
+		day = when.Format(u.t("lastused.layout"))
+	default:
+		day = when.Format(u.t("lastused.layout_year"))
+	}
+	return u.t("lastused.label", map[string]any{"When": day})
+}
+
+// nameDetailLayout places an item's name and its details (path, last used)
+// side by side in one line. The name gets the room it needs, but never more
+// than 60% of the line; the details get the rest. Both cut their text with
+// "…" when they don't fit, so the row never grows wider than the window.
+type nameDetailLayout struct {
+	nameWidth float32 // how wide the name is in full
+}
+
+func (l nameDetailLayout) MinSize(objects []fyne.CanvasObject) fyne.Size {
+	var h float32
+	for _, o := range objects {
+		h = max(h, o.MinSize().Height)
+	}
+	return fyne.NewSize(80, h) // narrow enough for any window
+}
+
+func (l nameDetailLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
+	name, detail := objects[0], objects[1]
+	nameW := min(l.nameWidth, size.Width*0.6)
+	name.Move(fyne.NewPos(0, 0))
+	name.Resize(fyne.NewSize(nameW, size.Height))
+	detail.Move(fyne.NewPos(nameW, 0))
+	detail.Resize(fyne.NewSize(max(size.Width-nameW, 0), size.Height))
 }

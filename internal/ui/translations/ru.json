@@ -142,5 +142,10 @@
   "settings.updates.own_build": "Эта копия собрана из локальных изменений или из коммита, которого нет на GitHub, поэтому её не с чем сравнить.",
   "settings.updates.failed": "Не получилось связаться с GitHub. Попробуйте позже.",
   "update.how_release": "Disk Cleaner скачает новую версию с GitHub, проверит, что она подписана разработчиком и нотаризована Apple, потом закроется и откроется уже новой версией.",
-  "update.downloading": "Скачиваю и проверяю обновление…"
+  "update.downloading": "Скачиваю и проверяю обновление…",
+  "lastused.label": "в последний раз {{.When}}",
+  "lastused.today": "сегодня",
+  "lastused.yesterday": "вчера",
+  "lastused.layout": "02.01",
+  "lastused.layout_year": "02.01.2006"
 }

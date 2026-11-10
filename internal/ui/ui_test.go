@@ -826,3 +826,19 @@ func TestUpdates(t *testing.T) {
 		}
 	})
 }
+
+func TestLastUsedText(t *testing.T) {
+	u := loaded(t)
+	now := time.Date(2026, 11, 10, 18, 0, 0, 0, time.UTC)
+
+	for when, want := range map[time.Time]string{
+		time.Date(2026, 11, 10, 8, 0, 0, 0, time.UTC):  "last used today",
+		time.Date(2026, 11, 9, 23, 0, 0, 0, time.UTC):  "last used yesterday",
+		time.Date(2026, 10, 25, 11, 0, 0, 0, time.UTC): "last used Oct 25",
+		time.Date(2025, 3, 1, 9, 0, 0, 0, time.UTC):    "last used Mar 1, 2025",
+	} {
+		if got := u.lastUsedText(when, now); got != want {
+			t.Errorf("lastUsedText(%v) = %q, want %q", when, got, want)
+		}
+	}
+}

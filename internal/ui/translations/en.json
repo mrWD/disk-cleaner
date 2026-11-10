@@ -142,5 +142,10 @@
   "settings.updates.own_build": "This copy was built from local changes or from a commit GitHub doesn't have, so it isn't compared.",
   "settings.updates.failed": "Couldn't reach GitHub. Try again later.",
   "update.how_release": "Disk Cleaner will download the new version from GitHub, check that it's signed by its developer and notarized by Apple, then close and open again as the new version.",
-  "update.downloading": "Downloading and checking the update…"
+  "update.downloading": "Downloading and checking the update…",
+  "lastused.label": "last used {{.When}}",
+  "lastused.today": "today",
+  "lastused.yesterday": "yesterday",
+  "lastused.layout": "Jan 2",
+  "lastused.layout_year": "Jan 2, 2006"
 }

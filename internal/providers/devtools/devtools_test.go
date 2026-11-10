@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"disk-cleaner/internal/core"
 	"disk-cleaner/internal/providers/kit"
@@ -83,6 +84,29 @@ func (m *machine) provider() *Provider {
 		hasCLI:    func(name string) bool { return slices.Contains(m.clis, name) },
 		processes: func(context.Context) []string { return m.processes },
 		tools:     tools,
+		// macOS says Claude was last opened on Nov 10, 2026; nothing else.
+		appLastUsed: func(app string) time.Time {
+			if filepath.Base(app) == "Claude.app" {
+				return claudeOpened
+			}
+			return time.Time{}
+		},
+		historyMin: 10_000_000,
+	}
+}
+
+// Dates the test machine knows.
+var (
+	claudeOpened   = time.Date(2026, 11, 10, 20, 18, 0, 0, time.UTC) // Claude.app, from macOS
+	codexSession   = time.Date(2026, 10, 25, 11, 5, 0, 0, time.UTC)  // the newest Codex session
+	vscodeLastFile = time.Date(2025, 3, 1, 9, 0, 0, 0, time.UTC)     // the newest file VS Code left
+)
+
+// touch sets a file's modification time.
+func touch(t *testing.T, path string, when time.Time) {
+	t.Helper()
+	if err := os.Chtimes(path, when, when); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -115,7 +139,7 @@ func TestScan(t *testing.T) {
 			"Codex · .codex/.tmp":                                              catCaches,
 			"Codex · codex-primary-runtime":                                    catRuntimes,
 			"Claude · Application Support/Claude":                              catInfo,
-			"Claude Code · .claude/projects":                                   catInfo,
+			"Claude Code · history · 1 more project":                           catInfo,
 		}
 		for name, cat := range want {
 			if got := byName(items, name).CategoryID; got != cat {
@@ -191,6 +215,64 @@ func TestScan(t *testing.T) {
 	})
 }
 
+func TestLastUsed(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("each row says when its tool was last used", func(t *testing.T) {
+		// Given: dates for Claude (from macOS), Codex (its newest session)
+		// and VS Code (removed: the newest file it left behind)
+		m := newMachine(t)
+		touch(t, filepath.Join(m.home, ".codex/sessions/chat.jsonl"), codexSession)
+		for _, f := range []string{".vscode/argv.json", ".vscode/extensions/ms-python.python-2024.1.0/package.json"} {
+			touch(t, filepath.Join(m.home, f), vscodeLastFile.Add(-time.Hour))
+		}
+		touch(t, filepath.Join(m.home, ".vscode/argv.json"), vscodeLastFile)
+
+		// When
+		items, _ := m.provider().Scan(ctx)
+
+		// Then
+		for name, want := range map[string]time.Time{
+			"Claude · Application Support/Claude": claudeOpened,
+			"Codex · .codex/.tmp":                 codexSession,
+			"Codex · codex-primary-runtime":       codexSession,
+			"VS Code · .vscode":                   vscodeLastFile,
+		} {
+			if got := byName(items, name).LastUsed; !got.Equal(want) {
+				t.Errorf("%q last used %v, want %v", name, got, want)
+			}
+		}
+	})
+
+	t.Run("a big project's history gets its own row, named after the project", func(t *testing.T) {
+		// Given: a project with 11 MB of history. Its session first mentions a
+		// worktree of another project (sessions can move around), then its own folder.
+		m := newMachine(t)
+		cwd := filepath.Join(kit.Home(), "Projects", "courses")
+		other := filepath.Join(kit.Home(), "Projects", "app", ".claude", "worktrees", "feature-x")
+		dir := filepath.Join(m.home, ".claude/projects", encodeRe.ReplaceAllString(cwd, "-"))
+		write(t, filepath.Join(dir, "a.jsonl"),
+			`{"type":"user","cwd":"`+other+`","message":"hi"}`+"\n"+`{"type":"user","cwd":"`+cwd+`"}`+"\n")
+		write(t, filepath.Join(dir, "big.bin"), strings.Repeat("x", 11_000_000))
+		lastSession := time.Date(2026, 11, 9, 10, 0, 0, 0, time.UTC)
+		touch(t, filepath.Join(dir, "a.jsonl"), lastSession)
+		touch(t, filepath.Join(dir, "big.bin"), lastSession.Add(-time.Hour))
+
+		// When
+		items, _ := m.provider().Scan(ctx)
+
+		// Then: its own protected row with the real folder and date; the small
+		// project from newMachine is in the row for the rest
+		row := byName(items, "Claude Code · history · ~/Projects/courses")
+		if row.Size < 11_000_000 || !row.LastUsed.Equal(lastSession) || row.Protected == nil {
+			t.Errorf("history row = %+v", row)
+		}
+		if byName(items, "Claude Code · history · 1 more project").ID == "" {
+			t.Error("the small project's history should be in the row for the rest")
+		}
+	})
+}
+
 func TestPlanNeverRemovesAHomeFolderItself(t *testing.T) {
 	// Given: VS Code leftovers in ~/.vscode, a folder directly in the home folder
 	m := newMachine(t)
@@ -231,4 +313,20 @@ func TestLibraryCachesHaveOneOwner(t *testing.T) {
 
 func TestTranslations(t *testing.T) {
 	providertest.CheckTranslations(t, New(), reasonRunning, reasonVersionRunning, reasonClaudeApp, reasonClaudeHistory)
+}
+
+func TestProjectName(t *testing.T) {
+	// A worktree's history reads as the project and the worktree's name.
+	cwd := filepath.Join(kit.Home(), "Projects", "app", ".claude", "worktrees", "feature-x")
+	dir := filepath.Join(t.TempDir(), encodeRe.ReplaceAllString(cwd, "-"))
+	write(t, filepath.Join(dir, "s.jsonl"), `{"cwd":"`+cwd+`"}`)
+
+	if got := projectName(dir); got != "~/Projects/app › feature-x" {
+		t.Errorf("projectName = %q", got)
+	}
+
+	// No session mentions the folder: its own name is shown as is.
+	if got := projectName(filepath.Join(t.TempDir(), "-Users-me-x")); got != "-Users-me-x" {
+		t.Errorf("projectName without sessions = %q", got)
+	}
 }

@@ -1,5 +1,7 @@
 package core
 
+import "time"
+
 // Status is what is currently happening to an item.
 // It is a separate type based on int, so that you can't
 // pass an arbitrary number in place of a status by accident.
@@ -27,6 +29,11 @@ type Item struct {
 	// Lingary_Test" is clearer than just "in use". Optional:
 	// if nil, the generic reason for the status is shown.
 	Busy *Reason
+
+	// LastUsed is when the thing was last used (an app last opened, a chat
+	// tool's last session), so the user can tell what's been sitting
+	// untouched. Zero means unknown, and the window shows nothing.
+	LastUsed time.Time
 
 	// Protected is protection from deletion. nil = not protected.
 	// * means a pointer: "a reference to a Reason, or nothing (nil)".
