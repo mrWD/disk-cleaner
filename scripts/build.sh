@@ -17,11 +17,26 @@
 #      after Info.plist is edited, the old signature no longer matches.
 #
 # Run it from any folder:
-#   ./scripts/build.sh            — only build into dist/
-#   ./scripts/build.sh --install  — build, install into /Applications and open it
-#                                   (a running copy is closed, the old one is replaced)
+#   ./scripts/build.sh                  — only build into dist/
+#   ./scripts/build.sh --install        — build, install into /Applications and open it
+#                                         (a running copy is closed, the old one is replaced)
+#   ./scripts/build.sh --release 1.2.0  — a build to hand out (GitHub Actions runs it):
+#                                         version 1.2.0, one binary for Apple Silicon and
+#                                         Intel, left unsigned for packaging/sign_macos.sh,
+#                                         and without the source folder (step 6): a
+#                                         downloaded copy updates from GitHub Releases
 set -e
 cd "$(dirname "$0")/.."
+
+MODE="build"
+case "$1" in
+--install) MODE="install" ;;
+--release)
+	MODE="release"
+	VERSION="$2"
+	[ -n "$VERSION" ] || { echo "Usage: $0 --release 1.2.0"; exit 1; }
+	;;
+esac
 
 APP="Disk Cleaner.app"
 PLIST="$APP/Contents/Info.plist"
@@ -105,23 +120,44 @@ fi
 
 # --- 4–7. Build ---
 step "Building $APP (the first build takes a few minutes)"
-"$FYNE" package -os darwin -release
+if [ "$MODE" = "release" ]; then
+	# The build number only has to grow; on GitHub Actions it's the run number.
+	"$FYNE" package -os darwin -release --app-version "$VERSION" --app-build "${GITHUB_RUN_NUMBER:-1}"
+
+	# fyne builds for this Mac's processor. Build the other one too and join
+	# them into one universal binary, so the download runs on any Mac.
+	BIN="$APP/Contents/MacOS/disk-cleaner"
+	case "$(uname -m)" in
+	arm64) OTHER=amd64 ;;
+	*) OTHER=arm64 ;;
+	esac
+	step "Adding the $OTHER binary"
+	TMP_BIN="$(mktemp)"
+	CGO_ENABLED=1 GOARCH="$OTHER" go build -trimpath -ldflags="-s -w" -o "$TMP_BIN" .
+	lipo -create "$BIN" "$TMP_BIN" -output "$BIN.universal"
+	mv "$BIN.universal" "$BIN"
+	rm -f "$TMP_BIN"
+else
+	"$FYNE" package -os darwin -release
+fi
 
 /usr/libexec/PlistBuddy -c "Delete :NSDownloadsFolderUsageDescription" "$PLIST" 2>/dev/null || true
 /usr/libexec/PlistBuddy -c "Add :NSDownloadsFolderUsageDescription string $TEXT" "$PLIST"
 
-# Remember which checkout the app was built from: the app's update button
-# runs git pull and this script again in that folder.
-pwd > "$APP/Contents/Resources/source-dir.txt"
+if [ "$MODE" != "release" ]; then
+	# Remember which checkout the app was built from: the app's update button
+	# runs git pull and this script again in that folder.
+	pwd > "$APP/Contents/Resources/source-dir.txt"
 
-codesign --force --deep --sign - "$APP"
+	codesign --force --deep --sign - "$APP"
+fi
 
 mkdir -p dist
 rm -rf "dist/$APP"
 mv "$APP" dist/
 echo "Built: dist/$APP"
 
-if [ "$1" = "--install" ]; then
+if [ "$MODE" = "install" ]; then
 	# Close the running copy so we can replace it, and install the new one.
 	# We move rather than copy: otherwise a second copy stays in dist/,
 	# and Spotlight and Launchpad show two identical Disk Cleaners.

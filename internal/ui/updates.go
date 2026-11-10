@@ -15,16 +15,18 @@ import (
 )
 
 // Updates. At launch, if Settings allow it, the app asks GitHub whether
-// there are newer commits than the one it was built from (internal/update).
-// If there are, a card above the disk card says so, and Update… shows
-// what's new and installs it the way the app was installed: from source,
-// in Terminal.
+// there's a newer version (internal/update). If there is, a card above the
+// disk card says so, and Update… shows what's new and installs it the way
+// the app was installed: a copy built from source rebuilds itself in
+// Terminal; a downloaded copy downloads the new release, checks its
+// signature, and restarts into it.
 
 // Updater is what the window needs from internal/update; tests use a fake.
 type Updater interface {
 	Version() string                                // the short commit of this copy, "" if unknown
-	Check(ctx context.Context) (update.News, error) // newer commits on GitHub
-	Install(ctx context.Context) error              // opens Terminal with git pull and build.sh
+	FromSource() bool                               // built from source rather than downloaded
+	Check(ctx context.Context) (update.News, error) // something newer on GitHub?
+	Install(ctx context.Context) (quit bool, err error)
 }
 
 // checkForUpdates runs the check in the background, if it's allowed. Any
@@ -77,7 +79,11 @@ func (u *App) showUpdate() {
 	if more := u.news.Count - len(u.news.Titles); more > 0 {
 		list.Add(secondary(u.t("update.more", map[string]any{"Count": more}), false))
 	}
-	how := u.wrapLabel(u.t("update.how"))
+	howKey := "update.how" // rebuilt from source in Terminal
+	if !u.opts.Updater.FromSource() {
+		howKey = "update.how_release" // downloaded, checked, swapped in
+	}
+	how := u.wrapLabel(u.t(howKey))
 	how.Importance = widget.LowImportance
 	list.Add(gap(0, 6))
 	list.Add(how)
@@ -92,11 +98,38 @@ func (u *App) showUpdate() {
 	closeSheet = u.showSheet(u.t("update.title"), sheetScroll(list), 560, 460, later, install)
 }
 
-// installUpdate opens Terminal with the update, or explains why it can't
-// be done automatically and what to run instead.
+// installUpdate starts the update. A copy built from source opens Terminal
+// right away; a downloaded copy downloads and checks the release first (a
+// few seconds, with a progress window), then quits so it can be replaced.
 func (u *App) installUpdate() {
-	err := u.opts.Updater.Install(context.Background())
+	if u.opts.Updater.FromSource() {
+		_, err := u.opts.Updater.Install(context.Background())
+		u.afterInstall(false, err)
+		return
+	}
+
+	bar := widget.NewProgressBarInfinite()
+	progress := dialog.NewCustomWithoutButtons(u.t("update.downloading"), container.NewVBox(bar), u.win)
+	progress.Resize(fyne.NewSize(420, 120))
+	progress.Show()
+	go func() {
+		quit, err := u.opts.Updater.Install(context.Background())
+		fyne.Do(func() {
+			progress.Hide()
+			u.afterInstall(quit, err)
+		})
+	}()
+}
+
+// afterInstall — what happens once the update has started (or failed to):
+// quit so the swap script can replace this copy, show that Terminal is on
+// it, or explain why it can't be done automatically and what to run instead.
+func (u *App) afterInstall(quit bool, err error) {
 	if err == nil {
+		if quit {
+			u.app.Quit() // the swap script waits for this, then opens the new copy
+			return
+		}
 		u.updating = true
 		u.fillUpdate()
 		return

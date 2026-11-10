@@ -140,5 +140,7 @@
   "settings.updates.found": "{{.Count}} new changes: see the card in the sidebar.",
   "settings.updates.found.one": "1 new change: see the card in the sidebar.",
   "settings.updates.own_build": "This copy was built from local changes or from a commit GitHub doesn't have, so it isn't compared.",
-  "settings.updates.failed": "Couldn't reach GitHub. Try again later."
+  "settings.updates.failed": "Couldn't reach GitHub. Try again later.",
+  "update.how_release": "Disk Cleaner will download the new version from GitHub, check that it's signed by its developer and notarized by Apple, then close and open again as the new version.",
+  "update.downloading": "Downloading and checking the update…"
 }

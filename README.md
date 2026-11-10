@@ -18,7 +18,13 @@ A macOS app written in Go with [Fyne](https://fyne.io). It finds what takes up s
 
 ## Install
 
-macOS only.
+macOS only, on Apple Silicon or Intel.
+
+### Download
+
+Download **Disk-Cleaner.dmg** from the [latest release](https://github.com/mrWD/disk-cleaner/releases/latest), open it and drag **Disk Cleaner** to Applications. It's signed with a Developer ID and notarized by Apple, so macOS opens it without warnings.
+
+### Build from source
 
 ```bash
 git clone https://github.com/mrWD/disk-cleaner.git
@@ -36,17 +42,20 @@ What the script installs if it isn't there yet:
 
 If `git` isn't installed, macOS offers to install the Command Line Tools as soon as you run `git clone`. Accept, then run the commands again.
 
+**Try it safely first:** turn on **Settings → Dry run**. The app then shows what it would delete, but doesn't touch anything.
+
+The first time you open Downloads in the app, macOS asks for access to that folder. A copy built from source is signed ad-hoc (without a developer certificate), so macOS may ask again after each rebuild.
+
 The first build takes a few minutes.
 
 ### Updates
 
-At launch the app asks GitHub whether `main` has commits newer than the one it was built from (Go writes that commit into the app at build time, so there are no version numbers to keep). If it does, a card in the sidebar says so, and **Update…** shows what's new. **Update** opens Terminal in the folder the app was built from, runs `git pull --ff-only` and `./scripts/build.sh --install`; the running copy is closed and the new one opens. If that folder has changes of its own, is on another branch or is gone, the app touches nothing and shows the commands to run by hand. Builds from uncommitted changes or from commits GitHub doesn't have aren't compared, so a developer's own build never nags.
+At launch the app asks GitHub whether there's a newer version. If there is, a card in the sidebar says so, and **Update…** shows what's new. How it updates depends on how you installed it:
 
-The check is one GET request to `api.github.com`; nothing about you or your Mac is sent. Turn it off in **Settings → Updates**, where **Check Now** checks right away. To update by hand: `git pull` and `./scripts/build.sh --install` in the folder you cloned.
+- **Downloaded** copy: a new version is a newer [release](https://github.com/mrWD/disk-cleaner/releases). **Update** downloads it, checks that it's signed by this project's Developer ID (team `742H5JJX37`) and accepted by Gatekeeper, then the app closes and opens again as the new version. A download that fails the check is never installed.
+- **Built from source**: a new version is a newer commit on `main` (Go writes the commit into the app at build time, so there are no version numbers to keep). **Update** opens Terminal in the folder the app was built from and runs `git pull --ff-only` and `./scripts/build.sh --install`. If that folder has changes of its own, is on another branch or is gone, the app touches nothing and shows the commands to run by hand. Builds from uncommitted changes or from commits GitHub doesn't have aren't compared, so a developer's own build never nags.
 
-**Try it safely first:** turn on **Settings → Dry run**. The app then shows what it would delete, but doesn't touch anything.
-
-The first time you open Downloads in the app, macOS asks for access to that folder. Because the app is signed ad-hoc (without a developer certificate), macOS may ask again after each rebuild.
+The check is one or two GET requests to `api.github.com`; nothing about you or your Mac is sent. Turn it off in **Settings → Updates**, where **Check Now** checks right away.
 
 ## Development
 
@@ -60,6 +69,26 @@ go test -tags screenshots -run TestScreenshots ./internal/ui/ -args -lang=en -da
 With `go run .` the app runs from the Terminal: there's no Dock icon of its own, and macOS asks for Downloads access on behalf of the Terminal.
 
 `go install github.com/mrWD/disk-cleaner@latest` doesn't work: the module is named `disk-cleaner`, not after its GitHub path.
+
+## Making a release
+
+```bash
+./scripts/release.sh 1.2.0
+```
+
+The script checks that you're on `main` with nothing uncommitted or unpushed, then pushes the tag `v1.2.0`. GitHub Actions ([`.github/workflows/release.yml`](.github/workflows/release.yml)) runs the tests, builds one app for Apple Silicon and Intel (`./scripts/build.sh --release 1.2.0`), signs it with the Developer ID and notarizes it ([`packaging/sign_macos.sh`](packaging/sign_macos.sh)), checks it with Gatekeeper, and publishes `Disk-Cleaner.dmg` (for people) and `Disk-Cleaner.zip` (for the updater) as a release. Without the signing secrets the build still runs, but nothing is published: an unsigned app would make macOS warn everyone.
+
+The workflow needs these repository secrets (the same as in ai-job-search):
+
+| Secret | What it is |
+|---|---|
+| `MACOS_CERT_P12` | the Developer ID Application certificate with its key, exported from Keychain Access as `.p12`, in base64 |
+| `MACOS_CERT_PASSWORD` | the password chosen for that `.p12` |
+| `MACOS_NOTARY_APPLE_ID` | the Apple ID of the developer account |
+| `MACOS_NOTARY_TEAM_ID` | the team: `742H5JJX37` |
+| `MACOS_NOTARY_PASSWORD` | an app-specific password for that Apple ID (appleid.apple.com → Sign-In and Security) |
+
+To sign and notarize on your own Mac instead: `./scripts/build.sh --release 1.2.0`, then `NOTARY_PROFILE=<profile> packaging/sign_macos.sh`, where the profile was saved once with `xcrun notarytool store-credentials`.
 
 ## Using it
 
@@ -108,7 +137,9 @@ internal/
   i18n/                      translations, language choice
   settings/                  settings (language, project folders, appearance, dry run, Never clean, permissions)
   access/                    checks macOS folder permissions
-  update/                    new versions: GitHub check, install from source
+  update/                    new versions: GitHub check; install from source or a signed release
+packaging/sign_macos.sh      signing, notarization, .dmg and .zip for a release
+.github/workflows/           the release build on GitHub Actions
   ui/                        the Fyne window; knows only core
   providers/
     kit/                     shared building blocks for providers

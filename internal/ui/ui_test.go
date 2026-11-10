@@ -773,8 +773,9 @@ type fakeUpdater struct {
 }
 
 func (f *fakeUpdater) Version() string                            { return "abc1234" }
+func (f *fakeUpdater) FromSource() bool                           { return true }
 func (f *fakeUpdater) Check(context.Context) (update.News, error) { return f.news, f.err }
-func (f *fakeUpdater) Install(context.Context) error              { f.installed = true; return nil }
+func (f *fakeUpdater) Install(context.Context) (bool, error)      { f.installed = true; return false, nil }
 
 func TestUpdates(t *testing.T) {
 	// waitFor gives the background check a moment to come back.
