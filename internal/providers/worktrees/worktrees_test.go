@@ -128,5 +128,5 @@ func TestScan(t *testing.T) {
 }
 
 func TestTranslations(t *testing.T) {
-	providertest.CheckTranslations(t, New(nil), reasonProcessRunning)
+	providertest.CheckTranslations(t, New(nil), reasonProcessRunning, reasonNoRoots)
 }

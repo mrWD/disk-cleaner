@@ -24,6 +24,7 @@ const (
 	keyUseDownloads     = "use_downloads"
 	keyAllowAdmin       = "allow_admin"
 	keyPermissionsAsked = "permissions_asked"
+	keyRootsConfirmed   = "worktree_roots_confirmed"
 )
 
 // Store reads and writes the settings.
@@ -52,14 +53,21 @@ func (s *Store) SetAppearance(mode string) { s.prefs.SetString(keyAppearance, mo
 // Roots are the folders to search for git worktrees. The default is ~/Projects.
 func (s *Store) Roots() []string {
 	roots := s.prefs.StringList(keyRoots)
-	if len(roots) == 0 {
-		return []string{filepath.Join(s.home, "Projects")}
+	if len(roots) == 0 && !s.RootsConfirmed() {
+		return []string{filepath.Join(s.home, "Projects")} // nothing chosen yet
 	}
-	return roots
+	return roots // what the user confirmed, even if it's an empty list
 }
 
+// RootsConfirmed — whether the user has confirmed the project folders (in the
+// first-launch window or with Save in Settings). Until then Roots is a guess.
+func (s *Store) RootsConfirmed() bool { return s.prefs.Bool(keyRootsConfirmed) }
+
 // SetRoots saves the folders to search for worktrees.
-func (s *Store) SetRoots(roots []string) { s.prefs.SetStringList(keyRoots, roots) }
+func (s *Store) SetRoots(roots []string) {
+	s.prefs.SetStringList(keyRoots, roots)
+	s.prefs.SetBool(keyRootsConfirmed, true)
+}
 
 // DryRun tells whether the "only show, delete nothing" mode (Dry run) is on.
 func (s *Store) DryRun() bool { return s.prefs.Bool(keyDryRun) }

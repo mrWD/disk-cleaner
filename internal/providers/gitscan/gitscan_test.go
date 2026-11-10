@@ -96,3 +96,31 @@ func TestFindBuilds(t *testing.T) {
 		t.Errorf("FindBuilds = %v, want %v", found, want)
 	}
 }
+
+func TestProjectFolders(t *testing.T) {
+	// Given: a home folder with repositories in different places
+	home := t.TempDir()
+	for _, dir := range []string{
+		"Projects/app/.git",            // the usual place
+		"my-projects/client/site/.git", // any name, two levels down
+		"dotfiles/.git",                // a folder that is a repository itself
+		"work",                         // no repositories: not a project folder
+		"deep/a/b/c/repo/.git",         // too deep to count
+		"Documents/code/.git",          // macOS protects Documents: never looked into
+		".hidden/repo/.git",            // hidden folders are skipped
+		"Library/Developer/x/.git",     // macOS's own folder
+	} {
+		if err := os.MkdirAll(filepath.Join(home, dir), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// When
+	got := ProjectFolders(home)
+
+	// Then: only the three real project folders, sorted by name
+	want := []string{filepath.Join(home, "Projects"), filepath.Join(home, "dotfiles"), filepath.Join(home, "my-projects")}
+	if !slices.Equal(got, want) {
+		t.Errorf("ProjectFolders = %v, want %v", got, want)
+	}
+}

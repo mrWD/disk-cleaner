@@ -13,6 +13,7 @@ import (
 	"cmp"
 	"context"
 	"embed"
+	"os"
 	"path/filepath"
 	"slices"
 	"time"
@@ -33,6 +34,7 @@ const (
 
 	// Reason: a process is running from the worktree (text is in translations).
 	reasonProcessRunning = "worktrees.process_running"
+	reasonNoRoots        = "worktrees.no_roots" // no project folder exists
 )
 
 // Provider looks for worktrees in the given folders.
@@ -69,7 +71,13 @@ func (p *Provider) Scan(ctx context.Context) ([]core.Item, error) {
 	var paths []string
 	var items []core.Item
 
-	for _, root := range p.roots() {
+	roots := existing(p.roots())
+	if len(roots) == 0 {
+		// Not "nothing found": there was nowhere to look, and the user should know.
+		return nil, core.Unavailable(reasonNoRoots)
+	}
+
+	for _, root := range roots {
 		for _, repo := range gitscan.FindRepos(root) {
 			if repo.Kind != gitscan.Worktree {
 				continue // main repositories belong to the projects provider
@@ -127,4 +135,15 @@ func (p *Provider) Scan(ctx context.Context) ([]core.Item, error) {
 
 func (p *Provider) Plan(items []core.Item) ([]core.Action, error) {
 	return kit.RemoveActions(items), nil
+}
+
+// existing — the folders from the list that exist on disk.
+func existing(dirs []string) []string {
+	var out []string
+	for _, d := range dirs {
+		if info, err := os.Stat(d); err == nil && info.IsDir() {
+			out = append(out, d)
+		}
+	}
+	return out
 }

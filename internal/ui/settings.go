@@ -2,16 +2,11 @@ package ui
 
 import (
 	"net/url"
-	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/dialog"
-	"fyne.io/fyne/v2/layout"
-	"fyne.io/fyne/v2/storage"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 
@@ -68,10 +63,9 @@ func (u *App) showSettings() {
 	// --- Appearance: three tiles, like System Settings in macOS ---
 	appearance := u.newAppearancePicker(s.Appearance())
 
-	// --- Folders to search for worktrees, one per line ---
-	roots := widget.NewMultiLineEntry()
-	roots.SetText(strings.Join(s.Roots(), "\n"))
-	roots.SetMinRowsVisible(3)
+	// --- Project folders: a list with Remove, Add Folder… and Find (folders.go) ---
+	roots := slices.Clone(s.Roots())
+	rootsBox := u.projectFolderList(&roots, false)
 	rootsHint := u.wrapLabel(u.t("settings.roots.hint"))
 	rootsHint.Importance = widget.LowImportance
 
@@ -105,7 +99,7 @@ func (u *App) showSettings() {
 	form := widget.NewForm(
 		widget.NewFormItem(u.t("settings.language"), language),
 		widget.NewFormItem(u.t("settings.appearance"), appearance.box),
-		widget.NewFormItem(u.t("settings.roots"), container.NewVBox(roots, rootsHint)),
+		widget.NewFormItem(u.t("settings.roots"), container.NewVBox(rootsHint, rootsBox)),
 		widget.NewFormItem("", dry),
 		widget.NewFormItem(u.t("settings.never"), neverBox),
 		widget.NewFormItem(u.t("settings.permissions"), permissions),
@@ -113,58 +107,42 @@ func (u *App) showSettings() {
 		widget.NewFormItem(u.t("settings.support"), container.NewVBox(supportHint, donate)),
 	)
 
-	// The form is taller than the window can be, so it scrolls.
-	d := dialog.NewCustomConfirm(u.t("settings.title"), u.t("settings.save"), u.t("confirm.cancel"), container.NewVScroll(form),
-		func(save bool) {
-			if !save {
-				return
-			}
+	// Save applies everything at once; Cancel throws the edits away.
+	apply := func() {
+		code := codes[max(language.SelectedIndex(), 0)]
+		s.SetLanguage(code)
+		u.tr.SetLanguage(code)
+		s.SetDryRun(dry.Checked)
 
-			code := codes[max(language.SelectedIndex(), 0)]
-			s.SetLanguage(code)
-			u.tr.SetLanguage(code)
-			s.SetDryRun(dry.Checked)
+		u.setAppearance(appearance.selected) // remember and apply
+		downloadsChanged := savePermissions()
 
-			u.setAppearance(appearance.selected) // remember and apply
-			downloadsChanged := savePermissions()
-
-			neverChanged := !slices.Equal(never, s.Excluded())
-			if neverChanged {
-				s.SetExcluded(never)
-				u.applyExclusions()
-			}
-
-			newRoots := parseRoots(roots.Text)
-			rootsChanged := !slices.Equal(newRoots, s.Roots())
-			if rootsChanged {
-				s.SetRoots(newRoots)
-			}
-
-			u.render() // rebuild the window in the new language
-			if rootsChanged || downloadsChanged {
-				u.scanAll()
-			}
-		}, u.win)
-	d.Resize(fyne.NewSize(700, 680))
-	d.Show()
-}
-
-// parseRoots turns the lines from the input field into a list of folders. ~ is expanded to the home folder.
-func parseRoots(text string) []string {
-	home, _ := os.UserHomeDir()
-
-	var out []string
-	for _, line := range strings.Split(text, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
+		if !slices.Equal(never, s.Excluded()) {
+			s.SetExcluded(never)
+			u.applyExclusions()
 		}
-		if line == "~" || strings.HasPrefix(line, "~/") {
-			line = filepath.Join(home, strings.TrimPrefix(line, "~"))
+
+		rootsChanged := !slices.Equal(roots, s.Roots())
+		if rootsChanged || !s.RootsConfirmed() {
+			s.SetRoots(roots) // saving also counts as confirming them
 		}
-		out = append(out, filepath.Clean(line))
+
+		u.render() // rebuild the window in the new language
+		if rootsChanged || downloadsChanged {
+			u.scanAll()
+		}
 	}
-	return out
+
+	// A sheet rather than a Fyne dialog: the form is taller than the window
+	// can be, and in a sheet it scrolls edge to edge (see sheet.go).
+	var closeSheet func()
+	cancel := widget.NewButtonWithIcon(u.t("confirm.cancel"), theme.CancelIcon(), func() { closeSheet() })
+	save := widget.NewButtonWithIcon(u.t("settings.save"), theme.ConfirmIcon(), func() {
+		closeSheet()
+		apply()
+	})
+	save.Importance = widget.HighImportance
+	closeSheet = u.showSheet(u.t("settings.title"), sheetScroll(form), 720, 700, cancel, save)
 }
 
 // neverList — the "Never clean" part of Settings: each entry with a Remove
@@ -181,46 +159,25 @@ func (u *App) neverList(list *[]settings.Exclusion) fyne.CanvasObject {
 			rows.Add(empty)
 		}
 		for i, e := range *list {
-			name := widget.NewLabel(e.Name)
-			name.Truncation = fyne.TextTruncateEllipsis // long names and paths don't widen the window
-			detail := widget.NewLabel(e.Detail)
-			detail.Truncation = fyne.TextTruncateEllipsis
-			detail.Importance = widget.LowImportance
-
-			remove := widget.NewButton(u.t("settings.never.remove"), func() {
+			rows.Add(u.listRow(e.Name, e.Detail, func() {
 				*list = slices.Delete(*list, i, i+1)
 				fill() // rebuild: the indexes of the rest have changed
-			})
-			remove.Importance = widget.LowImportance
-
-			rows.Add(container.NewBorder(nil, nil, nil, container.NewCenter(remove),
-				container.New(layout.NewCustomPaddedVBoxLayout(0), name, detail)))
+			}))
 		}
 		rows.Refresh()
+		u.refreshOverlays()
 	}
 	fill()
 
 	// Add Folder…: everything inside the chosen folder will be skipped.
 	add := widget.NewButtonWithIcon(u.t("settings.never.add"), theme.FolderOpenIcon(), func() {
-		pick := dialog.NewFolderOpen(func(dir fyne.ListableURI, err error) {
-			if err != nil || dir == nil {
-				return // cancelled
-			}
-			path := filepath.Clean(dir.Path())
+		u.pickFolder(func(path string) {
 			if slices.ContainsFunc(*list, func(e settings.Exclusion) bool { return e.ID == path }) {
 				return
 			}
 			*list = append(*list, settings.Exclusion{ID: path, Name: filepath.Base(path), Detail: tildePath(path)})
 			fill()
-		}, u.win)
-
-		if home, err := os.UserHomeDir(); err == nil {
-			if start, err := storage.ListerForURI(storage.NewFileURI(home)); err == nil {
-				pick.SetLocation(start) // start in the home folder
-			}
-		}
-		pick.Resize(fyne.NewSize(760, 520))
-		pick.Show()
+		})
 	})
 
 	return container.NewVBox(rows, container.NewHBox(add))

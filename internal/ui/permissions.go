@@ -3,10 +3,11 @@ package ui
 import (
 	"os"
 	"path/filepath"
+	"slices"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 
 	"disk-cleaner/internal/access"
@@ -28,7 +29,7 @@ import (
 // user can, in System Settings. So the switches control what Disk Cleaner
 // uses, and each folder permission has a button to that page of System
 // Settings. On first launch the same switches are shown before the first
-// scan (showIntro), so macOS asks for access right after the user has read why.
+// scan (showSetup), so macOS asks for access right after the user has read why.
 
 // foldersNeedingAccess — Desktop and Documents, if a project folder is inside them.
 func (u *App) foldersNeedingAccess() []string {
@@ -140,43 +141,65 @@ func (u *App) permissionsSection() (fyne.CanvasObject, func() bool) {
 	return rows, save
 }
 
-// showIntro — the window on first launch: which permissions Disk Cleaner
-// uses and why, with the same switches as in Settings. The first scan starts
-// only after Continue.
-func (u *App) showIntro() {
+// showSetup — the window before the first scan: the project folders to look
+// in and the permissions Disk Cleaner uses, with the same controls as in
+// Settings. The first scan starts only after Continue, so macOS asks for
+// Downloads access right after the user has read why.
+//
+// It shows on first launch, and once more for anyone who hasn't confirmed
+// the project folders yet (they used to be a fixed guess, ~/Projects).
+func (u *App) showSetup() {
+	// Project folders are looked for on this Mac if they were never confirmed.
+	u.setupSheet(!u.opts.Settings.RootsConfirmed())
+}
+
+// setupSheet builds and shows the setup window; findFolders starts the list
+// from the folders found on this Mac instead of the saved ones.
+func (u *App) setupSheet(findFolders bool) {
 	s := u.opts.Settings
+
+	roots := slices.Clone(s.Roots())
+	folders := u.projectFolderList(&roots, findFolders)
+	foldersHint := u.wrapLabel(u.t("setup.folders.hint"))
+	foldersHint.Importance = widget.LowImportance
 
 	downloads := widget.NewCheck(u.t("perm.downloads"), nil)
 	downloads.SetChecked(s.UseDownloads())
 	admin := widget.NewCheck(u.t("perm.admin"), nil)
 	admin.SetChecked(s.AllowAdmin())
 
-	content := container.NewVBox(
+	heading := func(key string) fyne.CanvasObject {
+		return text(u.t(key), theme.SizeNameText, theme.ColorNameForeground, true)
+	}
+
+	body := container.NewVBox(
 		u.wrapLabel(u.t("intro.text")),
+		gap(0, 4),
+		heading("settings.roots"),
+		foldersHint,
+		folders,
+		gap(0, 8),
+		heading("settings.permissions"),
 		u.permissionRow(downloads, u.t("perm.downloads.why")+" "+u.t("intro.downloads_note"), nil, false),
+		gap(0, 4),
 		u.permissionRow(admin, u.t("perm.admin.why"), nil, false),
 	)
 
-	// Our own blue Continue button instead of the dialog's grey one: it's the
-	// only way forward, so it looks like the main action.
-	var d dialog.Dialog
+	// The blue Continue is the only way forward, so it looks like the main action.
+	var closeSheet func()
 	next := widget.NewButton(u.t("intro.continue"), func() {
-		d.Hide()
-		u.finishIntro(downloads.Checked, admin.Checked)
+		closeSheet()
+		u.finishSetup(roots, downloads.Checked, admin.Checked)
 	})
 	next.Importance = widget.HighImportance
-	content.Add(gap(0, 6))
-	content.Add(container.NewCenter(next))
-
-	d = dialog.NewCustomWithoutButtons(u.t("intro.title"), content, u.win)
-	d.Resize(fyne.NewSize(620, 380))
-	d.Show()
+	closeSheet = u.showSheet(u.t("intro.title"), sheetScroll(body), 640, 600, next)
 }
 
-// finishIntro saves the choices from the first-launch window and starts the
-// first scan. If Downloads is on, that scan reads it and macOS asks for access.
-func (u *App) finishIntro(useDownloads, allowAdmin bool) {
+// finishSetup saves the choices from the setup window and starts the first
+// scan. If Downloads is on, that scan reads it and macOS asks for access.
+func (u *App) finishSetup(roots []string, useDownloads, allowAdmin bool) {
 	s := u.opts.Settings
+	s.SetRoots(roots)
 	s.SetUseDownloads(useDownloads)
 	s.SetAllowAdmin(allowAdmin)
 	s.SetPermissionsAsked(true)

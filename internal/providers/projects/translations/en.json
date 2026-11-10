@@ -1,6 +1,7 @@
 {
   "projects.name": "Projects",
   "projects.process_running": "A program started from this project is running ({{.Process}}), for example a dev server or a Gradle daemon. Stop it first.",
+  "projects.no_roots": "No project folders to look in. Add the folders where you keep your code in Settings › Project folders.",
   "projects.inactive.title": "Inactive projects",
   "projects.inactive.what": "node_modules, Pods, build, .venv and similar folders in git repositories without commits for more than 30 days.",
   "projects.inactive.why": "Only folders that git ignores are listed, so your code and commits are not touched. They are recreated by npm install, pod install or a build.",

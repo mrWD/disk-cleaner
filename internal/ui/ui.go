@@ -19,7 +19,9 @@
 //	scan.go        - scanning in the background
 //	clean.go       - the plan, confirmation and execution; "Clean All Safe"
 //	never.go       - the "Never clean" list
-//	permissions.go - permissions: the first-launch window and the section in Settings
+//	permissions.go - permissions and the setup window shown before the first scan
+//	folders.go     - editable folder lists: project folders, Add Folder…
+//	sheet.go       - the window-in-the-window used by Settings and the setup
 //	settings.go    - the settings window
 package ui
 
@@ -56,6 +58,10 @@ type Options struct {
 	Providers []core.Provider
 	Executor  core.Executor
 	Settings  *settings.Store
+
+	// FindProjectFolders suggests project folders (folders in ~ with git
+	// repositories). Optional: without it, the folders are only picked by hand.
+	FindProjectFolders func() []string
 }
 
 // providerState is what is known about one provider.
@@ -153,11 +159,12 @@ func New(a fyne.App, opts Options) (*App, error) {
 		fyne.Do(u.render)
 	})
 
-	// First launch: explain the permissions first; the scan starts after Continue.
-	if opts.Settings.PermissionsAsked() {
+	// First launch (or project folders never confirmed): the setup window
+	// comes first, and the scan starts after Continue.
+	if opts.Settings.PermissionsAsked() && opts.Settings.RootsConfirmed() {
 		u.scanAll()
 	} else {
-		u.showIntro()
+		u.showSetup()
 	}
 	return u, nil
 }

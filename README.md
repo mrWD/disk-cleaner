@@ -63,6 +63,7 @@ With `go run .` the app runs from the Terminal: there's no Dock icon of its own,
 - **Search in a section** with the field above its list.
 - A query is split into words, and each word must appear in the name, path or category title: `lingary node` finds `node_modules` from the Lingary worktree.
 - **Select All** selects what's visible right now (with a search, only the matches) and can be selected. Press it again to deselect. The checkbox in a category header selects the whole category.
+- **Project folders.** Before the first scan the app looks for folders right inside your home folder that contain git repositories, whatever their names (`~/Projects`, `~/work`, `~/my-projects`…), and asks you to confirm the list: remove what isn't a project, or add more with **Add Folder…**. Later you can change it in **Settings → Project folders**, where **Find Project Folders** searches again. Desktop, Documents and Downloads are never searched on their own, because macOS would ask for access; add a folder from there by hand. If there are no project folders at all, Worktrees and Projects say so instead of showing "Nothing found".
 - **Never clean.** Click the lock at the end of an item's row, or select items and press **Never Clean** in the bottom bar. The lock works for running items too, which can't be ticked. Locked items stay in the list with a "Never clean" label, can't be selected, and Clean All Safe skips them. In **Settings → Never clean** you can remove entries or **Add Folder…**: everything inside that folder is skipped too. To take one item back, click its lock again, or open its category and click **Allow cleaning**.
 - **Permissions.** On first launch, before the first scan, the app explains what it uses and why, with a switch for each. The same switches are in **Settings → Permissions**: looking in Downloads (macOS asks for access to that folder), project folders in Documents or Desktop if you keep projects there, and the administrator password (macOS asks for it each time, only to remove simulator caches; with it off, those items are skipped). macOS doesn't let apps change their own permissions, so to take one away completely use the **Open System Settings** link next to it.
 - **Checkboxes belong to the section you're looking at.** When you open another section or start a search, they're cleared, so you never clean something you can't see.
@@ -99,7 +100,8 @@ internal/
   shell/                     running programs without a shell
   executor/                  the actual deletion + safety checks
   i18n/                      translations, language choice
-  settings/                  settings (language, project folders, appearance, dry run)
+  settings/                  settings (language, project folders, appearance, dry run, Never clean, permissions)
+  access/                    checks macOS folder permissions
   ui/                        the Fyne window; knows only core
   providers/
     kit/                     shared building blocks for providers

@@ -278,3 +278,61 @@ func LastCommit(ctx context.Context, run shell.Runner, repo string) time.Time {
 	}
 	return time.Unix(sec, 0)
 }
+
+// notProjectFolders are folders right inside the home folder that are never
+// project folders: macOS's own, and the ones macOS protects. Looking inside
+// Desktop, Documents or Downloads would make macOS ask for access, and that
+// must not happen just to make a suggestion.
+var notProjectFolders = map[string]bool{
+	"Applications": true, "Desktop": true, "Documents": true, "Downloads": true,
+	"Library": true, "Movies": true, "Music": true, "Pictures": true, "Public": true,
+}
+
+// suggestDepth — how many levels below a folder to look for a repository
+// when deciding whether it's a project folder.
+const suggestDepth = 3
+
+// ProjectFolders suggests project folders: the folders right inside home
+// that have a git repository within a few levels (or are one). Names don't
+// matter, so ~/my-projects and ~/work are found as well as ~/Projects.
+// The result is sorted by name, because os.ReadDir sorts.
+func ProjectFolders(home string) []string {
+	entries, err := os.ReadDir(home)
+	if err != nil {
+		return nil
+	}
+
+	var out []string
+	for _, e := range entries {
+		name := e.Name()
+		if !e.IsDir() || strings.HasPrefix(name, ".") || notProjectFolders[name] {
+			continue
+		}
+		if dir := filepath.Join(home, name); hasRepo(dir, suggestDepth) {
+			out = append(out, dir)
+		}
+	}
+	return out
+}
+
+// hasRepo — whether dir is a git repository or has one within depth levels.
+// It stops at the first one it finds: one is enough to call it a project folder.
+func hasRepo(dir string, depth int) bool {
+	found := false
+	_ = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || !d.IsDir() {
+			return nil
+		}
+		rel, _ := filepath.Rel(dir, path)
+		if rel != "." && (skipWhileSearching[d.Name()] || strings.HasPrefix(d.Name(), ".") ||
+			strings.Count(rel, string(filepath.Separator)) >= depth) {
+			return fs.SkipDir
+		}
+		if _, ok := KindOf(path); ok {
+			found = true
+			return fs.SkipAll // stop the whole walk
+		}
+		return nil
+	})
+	return found
+}

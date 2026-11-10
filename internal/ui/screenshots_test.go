@@ -19,6 +19,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/test"
@@ -30,6 +31,7 @@ import (
 	"disk-cleaner/internal/providers/devtools"
 	"disk-cleaner/internal/providers/docker"
 	"disk-cleaner/internal/providers/downloads"
+	"disk-cleaner/internal/providers/gitscan"
 	"disk-cleaner/internal/providers/kit"
 	"disk-cleaner/internal/providers/models"
 	"disk-cleaner/internal/providers/packagecaches"
@@ -73,7 +75,8 @@ func TestScreenshots(t *testing.T) {
 	a := test.NewTempApp(t)
 	store := settings.New(a.Preferences(), kit.Home())
 	store.SetLanguage(*shotLang)
-	store.SetPermissionsAsked(true) // the first-launch window is captured separately at the end
+	store.SetPermissionsAsked(true) // the setup window is captured separately at the end
+	store.SetRoots([]string{filepath.Join(kit.Home(), "Projects")})
 	ex, _ := executor.New()
 
 	real := []core.Provider{
@@ -95,7 +98,8 @@ func TestScreenshots(t *testing.T) {
 		wrapped[i] = frozen{p}
 	}
 
-	u, err := New(a, Options{Providers: wrapped, Executor: ex, Settings: store})
+	u, err := New(a, Options{Providers: wrapped, Executor: ex, Settings: store,
+		FindProjectFolders: func() []string { return gitscan.ProjectFolders(kit.Home()) }})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,7 +185,14 @@ func TestScreenshots(t *testing.T) {
 		}
 	}
 
-	// The first-launch window about permissions.
-	u.showIntro()
-	save("intro")
+	// Settings scrolled to the end: the scrollbar and shadows run edge to edge.
+	u.showSettings()
+	save("settings")
+	u.win.Canvas().Overlays().Remove(u.win.Canvas().Overlays().Top())
+
+	// The setup window before the first scan, with project folders found on this Mac.
+	u.setupSheet(true)
+	save("intro-finding") // the search runs in the background…
+	time.Sleep(8 * time.Second)
+	save("intro") // …and here its result is in the list
 }

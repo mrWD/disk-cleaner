@@ -19,6 +19,7 @@ import (
 	"disk-cleaner/internal/providers/devtools"
 	"disk-cleaner/internal/providers/docker"
 	"disk-cleaner/internal/providers/downloads"
+	"disk-cleaner/internal/providers/gitscan"
 	"disk-cleaner/internal/providers/kit"
 	"disk-cleaner/internal/providers/models"
 	"disk-cleaner/internal/providers/packagecaches"
@@ -58,7 +59,13 @@ func main() {
 		downloads.New(store.UseDownloads), // will ask macOS for access to Downloads, if it is turned on in settings
 	}
 
-	if err := ui.Run(a, ui.Options{Providers: providers, Executor: ex, Settings: store}); err != nil {
+	if err := ui.Run(a, ui.Options{
+		Providers: providers,
+		Executor:  ex,
+		Settings:  store,
+		// Suggestions for the project folders: folders in ~ with git repositories.
+		FindProjectFolders: func() []string { return gitscan.ProjectFolders(kit.Home()) },
+	}); err != nil {
 		log.Fatal(err)
 	}
 }

@@ -41,7 +41,7 @@
   "settings.language": "Language",
   "settings.language.system": "Same as macOS",
   "settings.roots": "Project folders",
-  "settings.roots.hint": "One folder per line. Disk Cleaner looks for git repositories and worktrees inside them.",
+  "settings.roots.hint": "Disk Cleaner looks for git repositories and worktrees inside these folders.",
   "settings.dry_run": "Dry run: only show what would be deleted",
   "settings.save": "Save",
   "sidebar.section": "Categories",
@@ -103,10 +103,15 @@
   "perm.open": "Open System Settings",
   "perm.note": "macOS doesn't let apps change their own permissions. These switches decide what Disk Cleaner uses; to take a permission away completely, use System Settings.",
   "intro.title": "Before the first scan",
-  "intro.text": "Disk Cleaner uses these permissions. You can change them any time in Settings › Permissions.",
+  "intro.text": "Check these before the first scan. You can change them any time in Settings.",
   "intro.downloads_note": "macOS will ask you to allow access to Downloads right after you continue.",
   "intro.continue": "Continue",
   "admin.skipped": "{{.Count}} items are left out: they need the administrator password, which is turned off in Settings › Permissions.",
   "admin.skipped.one": "1 item is left out: it needs the administrator password, which is turned off in Settings › Permissions.",
-  "admin.all_skipped": "Everything selected needs the administrator password, which is turned off in Settings › Permissions."
+  "admin.all_skipped": "Everything selected needs the administrator password, which is turned off in Settings › Permissions.",
+  "folders.none": "No project folders yet. Add the folders where you keep your code.",
+  "folders.find": "Find Project Folders",
+  "folders.finding": "Looking for folders with git repositories…",
+  "folders.found_none": "No folders with git repositories were found in your home folder. Add the folders where you keep your code.",
+  "setup.folders.hint": "Disk Cleaner looks for git repositories and worktrees in these folders. Below are the folders with git repositories found on your Mac: remove any that aren't projects, or add more."
 }

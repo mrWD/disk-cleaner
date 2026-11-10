@@ -6,8 +6,10 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -146,7 +148,8 @@ func loaded(t *testing.T) *App {
 	a := test.NewTempApp(t) // an app without a real screen, for tests
 	store := settings.New(a.Preferences(), t.TempDir())
 	store.SetLanguage("en")
-	store.SetPermissionsAsked(true) // not the first launch: no permissions window
+	store.SetPermissionsAsked(true) // not the first launch: no setup window
+	store.SetRoots(nil)
 
 	u, err := New(a, Options{
 		Providers: []core.Provider{
@@ -608,10 +611,13 @@ func TestPermissions(t *testing.T) {
 			t.Error("scanning should wait until the user continues")
 		}
 
-		// When: Continue with Downloads off
-		u.finishIntro(false, true)
+		// When: Continue with one project folder and Downloads off
+		u.finishSetup([]string{"/Users/me/work"}, false, true)
 
-		// Then: the choice is saved and the scan starts
+		// Then: the choices are saved and the scan starts
+		if roots := store.Roots(); len(roots) != 1 || roots[0] != "/Users/me/work" || !store.RootsConfirmed() {
+			t.Errorf("roots = %v, confirmed = %v", roots, store.RootsConfirmed())
+		}
 		if store.UseDownloads() || !store.AllowAdmin() || !store.PermissionsAsked() {
 			t.Errorf("saved: downloads = %v, admin = %v, asked = %v", store.UseDownloads(), store.AllowAdmin(), store.PermissionsAsked())
 		}
@@ -659,4 +665,35 @@ func byName(u *App, name string) core.Item {
 		}
 	}
 	return core.Item{}
+}
+
+func TestProjectFolders(t *testing.T) {
+	t.Run("the setup window starts from the folders found on this Mac", func(t *testing.T) {
+		// Given: the search finds two folders
+		u := loaded(t)
+		u.opts.FindProjectFolders = func() []string { return []string{"/Users/me/my-projects", "/Users/me/work"} }
+
+		// When: the list starts with a search
+		var roots []string
+		u.projectFolderList(&roots, true)
+
+		// Then: once the background search is done, both are in the list
+		deadline := time.Now().Add(2 * time.Second)
+		for len(roots) < 2 && time.Now().Before(deadline) {
+			time.Sleep(10 * time.Millisecond)
+		}
+		if !slices.Equal(roots, []string{"/Users/me/my-projects", "/Users/me/work"}) {
+			t.Errorf("roots = %v", roots)
+		}
+	})
+
+	t.Run("confirming an empty list means no folders, not the old guess", func(t *testing.T) {
+		u := loaded(t)
+
+		u.finishSetup(nil, true, true)
+
+		if roots := u.opts.Settings.Roots(); len(roots) != 0 {
+			t.Errorf("roots = %v, want none", roots)
+		}
+	})
 }

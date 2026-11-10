@@ -1,6 +1,7 @@
 {
   "worktrees.name": "Worktree",
   "worktrees.process_running": "Работает программа, запущенная из этого worktree ({{.Process}}), например dev-сервер или демон Gradle. Сначала остановите её.",
+  "worktrees.no_roots": "Негде искать: нет папок с проектами. Добавьте папки, где лежит ваш код, в настройках › «Папки с проектами».",
   "worktrees.artifacts.title": "Зависимости и сборки в worktree",
   "worktrees.artifacts.what": "node_modules, Pods, build и похожие папки внутри дополнительных git worktree, например тех, что создают сессии Claude Code в .claude/worktrees.",
   "worktrees.artifacts.why": "Показываются только папки, которые git игнорирует, поэтому ваш код и коммиты не затрагиваются. Папки, которые использует запущенный процесс (dev-сервер из этого worktree), выбрать нельзя.",
