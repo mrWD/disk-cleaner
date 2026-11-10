@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"fyne.io/fyne/v2"
+
+	"disk-cleaner/internal/core"
 )
 
 // scanAll rescans all providers at the same time.
@@ -34,14 +36,19 @@ func (u *App) scan(st *providerState) {
 	go func() {
 		items, err := st.provider.Scan(context.Background())
 
-		fyne.Do(func() {
-			if st.gen != gen {
-				return // while we were searching, a new scan was started, so our result is stale
-			}
-			st.scanning = false
-			u.markExcluded(items) // the "Never clean" list, see never.go
-			st.items, st.err = items, err
-			u.refresh()
-		})
+		fyne.Do(func() { u.finishScan(st, gen, items, err) })
 	}()
+}
+
+// finishScan takes a scan's result in the UI thread. A result from an older
+// scan of the same section is thrown away: a newer one is already running.
+func (u *App) finishScan(st *providerState, gen int, items []core.Item, err error) {
+	if st.gen != gen {
+		return // while we were searching, a new scan was started, so our result is stale
+	}
+	st.scanning = false
+	st.stopAnimations()   // the spinner and skeleton have done their job
+	u.markExcluded(items) // the "Never clean" list, see never.go
+	st.items, st.err = items, err
+	u.refresh()
 }

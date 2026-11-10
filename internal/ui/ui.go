@@ -17,6 +17,7 @@
 //	search.go      - search over all sections and over the open section, "Select All"
 //	bottom.go      - the bottom strip: what is selected, Never Clean, Review & Clean…
 //	scan.go        - scanning in the background
+//	animation.go   - the spinner and skeleton cards shown while a section scans
 //	clean.go       - the plan, confirmation and execution; "Clean All Safe"
 //	never.go       - the "Never clean" list
 //	permissions.go - permissions and the setup window shown before the first scan
@@ -73,6 +74,12 @@ type providerState struct {
 	gen      int // scan number: results of outdated scans are thrown away
 	items    []core.Item
 	err      error
+
+	// While scanning: the sidebar spinner, the skeleton cards and their
+	// animations, kept across window rebuilds (see animation.go).
+	spinner  fyne.CanvasObject
+	skeleton fyne.CanvasObject
+	anims    []*fyne.Animation
 }
 
 // App is the window and its state.
@@ -184,6 +191,11 @@ func Run(a fyne.App, opts Options) error {
 // are kept, because they live in u.sel.
 func (u *App) render() {
 	u.win.SetTitle(u.t("app.title"))
+
+	// New theme or language: animations are made again in the new colours.
+	for _, st := range u.states {
+		st.stopAnimations()
+	}
 
 	u.banner = container.NewVBox()
 	u.details = container.NewStack() // Stack shows its object over the whole area

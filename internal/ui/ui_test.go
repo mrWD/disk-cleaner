@@ -697,3 +697,39 @@ func TestProjectFolders(t *testing.T) {
 		}
 	})
 }
+
+func TestScanAnimation(t *testing.T) {
+	t.Run("the animation survives rebuilds, so it doesn't restart", func(t *testing.T) {
+		// Given: docker is scanning and open
+		u := loaded(t)
+		docker := u.states[1]
+		docker.scanning = true
+		u.selectProvider(1)
+		spinner, skeleton := docker.spinner, docker.skeleton
+		if spinner == nil || skeleton == nil {
+			t.Fatal("a scanning section should show a spinner in the sidebar and skeleton cards")
+		}
+
+		// When: another section finishes and the window is rebuilt
+		u.finishScan(u.states[0], u.states[0].gen, []core.Item{derived}, nil)
+
+		// Then: still the very same objects
+		if docker.spinner != spinner || docker.skeleton != skeleton {
+			t.Error("spinner and skeleton were made anew, so their animation would start over")
+		}
+	})
+
+	t.Run("they go away when the scan ends", func(t *testing.T) {
+		u := loaded(t)
+		docker := u.states[1]
+		docker.scanning = true
+		u.selectProvider(1)
+
+		u.finishScan(docker, docker.gen, []core.Item{postgres}, nil)
+
+		if docker.spinner != nil || docker.skeleton != nil || len(docker.anims) != 0 {
+			t.Error("animations should stop and be forgotten when the scan ends")
+		}
+		mustShow(t, u, "postgres:17")
+	})
+}

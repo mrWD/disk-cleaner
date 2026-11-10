@@ -133,6 +133,20 @@ func TestScreenshots(t *testing.T) {
 		save(st.provider.ID())
 	}
 
+	// Scanning: the first two sections pretend to be still scanning, to show
+	// the sidebar spinners and the skeleton cards; then their results come back.
+	for _, st := range u.states[:2] {
+		st.scanning = true
+	}
+	u.selectProvider(1)
+	u.relayout()
+	save("scanning")
+	for _, st := range u.states[:2] {
+		st.scanning = false
+		st.stopAnimations()
+	}
+	u.refresh()
+
 	// An expanded category: explanations and details.
 	u.selectProvider(0)
 	if cats := u.states[0].provider.Categories(); len(cats) > 0 {

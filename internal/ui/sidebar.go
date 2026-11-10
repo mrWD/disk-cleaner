@@ -110,7 +110,10 @@ func (u *App) sidebarRow(i int, st *providerState) fyne.CanvasObject {
 	}
 
 	name := text(u.t(st.provider.ID()+".name"), theme.SizeNameText, nameColor, selected)
-	status := text(statusText, sizeCaption, statusColor, false)
+	var status fyne.CanvasObject = text(statusText, sizeCaption, statusColor, false)
+	if st.scanning {
+		status = u.spinner(st) // instead of the word "Scanning…"
+	}
 
 	row := pad(5, 5, 6, 8, container.NewBorder(nil, nil,
 		container.NewHBox(badge(icon, tint, 22), container.NewCenter(name)),
