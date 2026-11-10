@@ -44,9 +44,6 @@
   "settings.roots.hint": "One folder per line. Disk Cleaner looks for git repositories and worktrees inside them.",
   "settings.dry_run": "Dry run: only show what would be deleted",
   "settings.save": "Save",
-  "header.available": "{{.Free}} available of {{.Total}}",
-  "legend.other": "Other",
-  "legend.available": "Available",
   "sidebar.section": "Categories",
   "details.subtitle": "Found {{.Size}} in {{.Count}} items",
   "bottom.none": "Nothing selected",
@@ -73,5 +70,11 @@
   "settings.appearance": "Appearance",
   "settings.appearance.system": "Auto",
   "settings.appearance.light": "Light",
-  "settings.appearance.dark": "Dark"
+  "settings.appearance.dark": "Dark",
+  "disk.available": "{{.Free}} available of {{.Total}}",
+  "button.clean_all": "Clean All",
+  "clean_all.caption": "Safe items only · {{.Size}}",
+  "clean_all.scanning": "Available when scanning finishes",
+  "clean_all.nothing": "Nothing safe to clean",
+  "confirm.safe_only": "Only items marked Safe are included. Caution items and anything running or in use are left alone: select those yourself if you need them cleaned."
 }

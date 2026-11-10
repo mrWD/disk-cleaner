@@ -44,6 +44,18 @@ func (u *App) refreshDetails() {
 		return
 	}
 
+	// Выбор принадлежит тому, что видно. Перешли в другой раздел или в
+	// поиск — отметки снимаются: иначе в нижней полосе оставались бы
+	// объекты, которых на экране нет, и их легко было бы удалить случайно.
+	// Смена языка или оформления вид не меняет — там отметки остаются.
+	if key := u.viewKey(); key != u.selView {
+		u.selView = key
+		if u.sel.Len() > 0 {
+			u.sel.Clear()
+			u.updateBottom()
+		}
+	}
+
 	if key := u.viewKey(); key != u.topKey || u.detailsTop == nil {
 		u.topKey = key
 		u.detailsTop = u.buildTop()
@@ -75,15 +87,19 @@ func (u *App) refreshDetails() {
 }
 
 // buildTop — шапка: значок и крупный заголовок, подзаголовок, ниже
-// поле поиска по разделу и кнопка «Выбрать все».
+// поле поиска по разделу и кнопки «Выбрать все» и «Очистить всё».
 func (u *App) buildTop() *fyne.Container {
 	var icon []byte
 	tint := theme.Color(colorUsed)
 	name := u.t("search.title")
 	var search fyne.CanvasObject = gap(0, 0)
+	u.cleanAllBtn = nil
 
 	if !u.searching() {
 		st := u.states[u.current]
+		// «Очистить всё» — всё безопасное в этом разделе. Сначала всё равно
+		// откроется окно проверки со списком команд.
+		u.cleanAllBtn = widget.NewButtonWithIcon(u.t("button.clean_all"), theme.DeleteIcon(), func() { u.cleanAll(st) })
 		icon, tint = u.look(st.provider)
 		name = u.t(st.provider.ID() + ".name")
 		u.sectionQuery = "" // новый раздел — поиск с чистого листа
@@ -113,19 +129,32 @@ func (u *App) buildTop() *fyne.Container {
 	)
 
 	u.selectAllBtn = widget.NewButtonWithIcon(u.t("button.select_all"), theme.CheckButtonCheckedIcon(), u.toggleVisibleSelection)
-	toolbar := container.NewBorder(nil, nil, nil, u.selectAllBtn, search)
+	buttons := container.NewHBox(u.selectAllBtn)
+	if u.cleanAllBtn != nil {
+		buttons.Add(u.cleanAllBtn)
+	}
+	toolbar := container.NewBorder(nil, nil, nil, buttons, search)
 
 	return pad(14, 8, 20, 20, container.NewVBox(heading, gap(0, 4), toolbar))
 }
 
-// updateTop меняет в шапке то, что зависит от данных: подзаголовок и
-// надпись «Выбрать все / Снять все». Само поле поиска не трогается.
+// updateTop меняет в шапке то, что зависит от данных: подзаголовок,
+// надпись «Выбрать все / Снять все» и доступность «Очистить всё».
+// Само поле поиска не трогается.
 func (u *App) updateTop() {
 	if u.subtitle == nil {
 		return
 	}
 
 	setText(u.subtitle, u.subtitleText())
+
+	if u.cleanAllBtn != nil {
+		if len(safeItems(u.states[u.current])) == 0 {
+			u.cleanAllBtn.Disable() // безопасного нет (или раздел ещё сканируется)
+		} else {
+			u.cleanAllBtn.Enable()
+		}
+	}
 
 	items := u.selectableVisible()
 	switch {

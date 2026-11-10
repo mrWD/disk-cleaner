@@ -102,7 +102,7 @@ func TestScreenshots(t *testing.T) {
 		st.scanning, st.items, st.err = false, results[i].items, results[i].err
 	}
 	if *shotDark {
-		u.applyAppearance(appearanceDark) // так же, как кнопка в шапке
+		u.applyAppearance(appearanceDark) // так же, как плитка «Тёмное» в настройках
 	}
 	u.win.Resize(fyne.NewSize(1180, 780))
 	u.render()
@@ -161,4 +161,9 @@ func TestScreenshots(t *testing.T) {
 	u.refresh()
 	u.reviewAndClean()
 	save("confirm")
+	u.win.Canvas().Overlays().Remove(u.win.Canvas().Overlays().Top())
+
+	// Окно проверки от кнопки «Очистить всё» в боковой панели.
+	u.cleanAll(u.states...)
+	save("clean-all")
 }

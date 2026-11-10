@@ -44,9 +44,6 @@
   "settings.roots.hint": "По одной папке на строке. Disk Cleaner ищет внутри них git-репозитории и worktree.",
   "settings.dry_run": "Пробный режим: только показывать, что будет удалено",
   "settings.save": "Сохранить",
-  "header.available": "Доступно {{.Free}} из {{.Total}}",
-  "legend.other": "Прочее",
-  "legend.available": "Свободно",
   "sidebar.section": "Разделы",
   "details.subtitle": "Найдено {{.Size}}, объектов: {{.Count}}",
   "bottom.none": "Ничего не выбрано",
@@ -73,5 +70,11 @@
   "settings.appearance": "Оформление",
   "settings.appearance.system": "Авто",
   "settings.appearance.light": "Светлое",
-  "settings.appearance.dark": "Тёмное"
+  "settings.appearance.dark": "Тёмное",
+  "disk.available": "Доступно {{.Free}} из {{.Total}}",
+  "button.clean_all": "Очистить всё",
+  "clean_all.caption": "Только безопасное · {{.Size}}",
+  "clean_all.scanning": "Станет доступно после сканирования",
+  "clean_all.nothing": "Безопасно удалить нечего",
+  "confirm.safe_only": "Сюда входит только помеченное «Безопасно». Объекты «Осторожно», а также запущенное и занятое не трогаются: если их тоже нужно удалить, отметьте сами."
 }

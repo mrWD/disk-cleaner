@@ -25,10 +25,61 @@ func (u *App) providers() []core.Provider {
 	return out
 }
 
-// reviewAndClean строит план и показывает его ДО выполнения:
-// каждую команду и каждый путь, ровно как они будут выполнены.
+// reviewAndClean — кнопка «Проверить и очистить»: план для отмеченного.
 func (u *App) reviewAndClean() {
-	plan, err := core.BuildPlan(u.sel, u.providers())
+	u.review(u.sel, "")
+}
+
+// safeItems — что из раздела можно удалить, не раздумывая: объекты из
+// категорий Safe, которые можно выбрать (не запущены, не заняты, не
+// защищены). Пока раздел сканируется или с ошибкой — ничего.
+func safeItems(st *providerState) []core.Item {
+	if st.scanning || st.err != nil {
+		return nil
+	}
+
+	var out []core.Item
+	for _, cat := range st.provider.Categories() {
+		if cat.Risk != core.RiskSafe {
+			continue // «Осторожно» — только если человек отметит сам
+		}
+		for _, it := range itemsOf(st.items, cat.ID) {
+			if ok, _ := it.CanSelect(); ok {
+				out = append(out, it)
+			}
+		}
+	}
+	return out
+}
+
+// safeSelection — отдельный выбор из всего безопасного в разделах states.
+// Отдельный, а не u.sel: галочки на экране кнопка «Очистить всё» не трогает,
+// и если в окне проверки нажать «Отмена», всё останется как было.
+func (u *App) safeSelection(states ...*providerState) *core.Selection {
+	sel := core.NewSelection()
+	for _, st := range states {
+		for _, it := range safeItems(st) {
+			_ = sel.Add(it) // ошибки быть не может: safeItems отдаёт только то, что можно выбрать
+		}
+	}
+	return sel
+}
+
+// cleanAll — кнопки «Очистить всё»: в разделе (один state) или во всех.
+// Удаляет не сразу: сначала то же окно проверки со списком команд.
+func (u *App) cleanAll(states ...*providerState) {
+	sel := u.safeSelection(states...)
+	if sel.Len() == 0 {
+		return
+	}
+	u.review(sel, u.t("confirm.safe_only"))
+}
+
+// review строит план для sel и показывает его ДО выполнения:
+// каждую команду и каждый путь, ровно как они будут выполнены.
+// note — пояснение под первой строкой (у «Очистить всё» — что входит).
+func (u *App) review(sel *core.Selection, note string) {
+	plan, err := core.BuildPlan(sel, u.providers())
 	if err != nil {
 		dialog.ShowInformation(u.t("error.title"), u.errText(err), u.win)
 		return
@@ -39,6 +90,9 @@ func (u *App) reviewAndClean() {
 		"Count": len(actions),
 		"Size":  plan.Total().String(),
 	}), true))
+	if note != "" {
+		content.Add(secondary(note, true))
+	}
 
 	for _, step := range plan.Steps {
 		icon, tint := u.look(step.Provider)
@@ -136,7 +190,7 @@ func (u *App) execute(plan core.Plan) {
 					}
 				}
 			}
-			u.fillHeader() // обновить свободное место и полосу диска
+			u.fillDisk() // обновить свободное место и полосу диска
 		})
 	}()
 }

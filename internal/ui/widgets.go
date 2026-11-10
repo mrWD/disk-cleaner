@@ -360,13 +360,3 @@ func storageBar(parts []segment) fyne.CanvasObject {
 
 	return container.New(barLayout{weights: weights, gap: 2}, objects...)
 }
-
-// legendDot — пункт подписи к полосе: цветная точка, название, размер.
-func legendDot(c color.Color, name, size string) fyne.CanvasObject {
-	dot := canvas.NewCircle(c)
-	return container.NewHBox(
-		container.NewCenter(container.NewGridWrap(fyne.NewSize(9, 9), dot)),
-		text(name, sizeCaption, theme.ColorNameForeground, false),
-		text(size, sizeCaption, colorSecondary, false),
-	)
-}

@@ -6,7 +6,9 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
+	"fyne.io/fyne/v2/widget"
 
 	"disk-cleaner/internal/core"
 )
@@ -14,11 +16,16 @@ import (
 // sidebarWidth — ширина боковой панели, как в Finder.
 const sidebarWidth = 270
 
-// buildSidebar — боковая панель: значок и имя приложения, поле поиска
-// по всем разделам (как в Системных настройках), подзаголовок и строки
-// разделов с цветными значками.
+// buildSidebar — боковая панель сверху вниз:
+//   - значок и имя приложения;
+//   - поле поиска по всем разделам (как в Системных настройках);
+//   - строки разделов с цветными значками — они прокручиваются, если
+//     окно низкое;
+//   - внизу плашка диска: сколько свободно и кнопка «Очистить всё» (disk.go),
+//     а под ней кнопки «Пересканировать» и «Настройки».
 func (u *App) buildSidebar() fyne.CanvasObject {
 	u.sidebarRows = container.NewVBox()
+	u.disk = container.NewVBox()
 	u.searchEntry = searchField(u.t("search.global"), u.globalQuery, u.setGlobalQuery)
 
 	logo := canvas.NewImageFromResource(fyne.NewStaticResource("appicon.png", appIcon))
@@ -28,14 +35,29 @@ func (u *App) buildSidebar() fyne.CanvasObject {
 
 	section := text(u.t("sidebar.section"), theme.SizeNameCaptionText, colorSecondary, true)
 
-	list := container.NewVBox(
+	top := container.NewVBox(
 		head,
 		gap(0, 4),
 		u.searchEntry,
 		gap(0, 4),
-		pad(0, 0, 8, 0, section),
-		u.sidebarRows,
+		// Снизу отступ: строки разделов лежат в отдельной прокрутке, и
+		// VBox свой промежуток между подписью и ними уже не добавляет.
+		pad(0, 6, 8, 0, section),
 	)
+
+	// Внизу панели: плашка диска и под ней плоские кнопки, как в панели инструментов.
+	rescan := widget.NewButtonWithIcon(u.t("button.rescan"), theme.ViewRefreshIcon(), u.scanAll)
+	rescan.Importance = widget.LowImportance
+	openSettings := widget.NewButtonWithIcon(u.t("button.settings"), theme.SettingsIcon(), u.showSettings)
+	openSettings.Importance = widget.LowImportance
+	footer := container.NewVBox(
+		pad(8, 0, 0, 0, u.disk),
+		pad(4, 0, 0, 0, container.NewHBox(rescan, layout.NewSpacer(), openSettings)),
+	)
+
+	// edges: шапка сверху, диск и кнопки снизу, а строки разделов занимают всё,
+	// что осталось, и прокручиваются, если не помещаются.
+	list := edges(top, footer, nil, nil, container.NewVScroll(u.sidebarRows))
 
 	bg := canvas.NewRectangle(theme.Color(colorSidebar))
 	divider := canvas.NewRectangle(theme.Color(theme.ColorNameSeparator))
@@ -44,7 +66,7 @@ func (u *App) buildSidebar() fyne.CanvasObject {
 	return container.NewStack(
 		bg,
 		edges(nil, nil, nil, divider,
-			pad(16, 16, 10, 10, container.NewStack(gap(sidebarWidth, 0), list))),
+			pad(16, 10, 10, 10, container.NewStack(gap(sidebarWidth, 0), list))),
 	)
 }
 

@@ -9,13 +9,13 @@
 //	ui.go        — создание окна и общая раскладка
 //	theme.go     — тема: цвета macOS, шрифт San Francisco, размеры
 //	widgets.go   — кирпичики оформления: плашки, таблетки, значки, полоса диска
-//	header.go    — шапка: диск, полоса заполнения, кнопки
-//	sidebar.go   — боковая панель с разделами
+//	sidebar.go   — боковая панель: диск, «Очистить всё», поиск, разделы, кнопки
+//	disk.go      — плашка диска в боковой панели и кнопка «Очистить всё»
 //	details.go   — правая часть: шапка раздела, категории, строки объектов
 //	search.go    — поиск по всем разделам и по открытому разделу, «Выбрать все»
 //	bottom.go    — нижняя полоса: что выбрано и кнопка очистки
 //	scan.go      — сканирование в фоне
-//	clean.go     — план, подтверждение и выполнение
+//	clean.go     — план, подтверждение и выполнение; «Очистить всё»
 //	settings.go  — окно настроек
 package ui
 
@@ -77,13 +77,19 @@ type App struct {
 
 	current int // какой раздел выбран слева
 
+	// selView — для какого вида (раздел или поиск) сделан текущий выбор.
+	// Сменился вид — отметки снимаются (см. refreshDetails).
+	selView string
+
 	// Поиск и вид списка.
 	globalQuery  string          // поиск по всем разделам (поле в боковой панели)
 	sectionQuery string          // поиск в открытом разделе (поле над списком)
 	expanded     map[string]bool // категория → развёрнута ли (по умолчанию — свёрнута)
 
 	// Части окна, которые перестраиваются при изменениях.
-	header        *fyne.Container
+	banner        *fyne.Container // полоса «Включён пробный режим» над правой частью
+	disk          *fyne.Container // плашка диска в боковой панели
+	cleanEvery    *widget.Button  // «Очистить всё» во всех разделах (в плашке диска)
 	sidebarRows   *fyne.Container
 	searchEntry   *widget.Entry // поле глобального поиска
 	details       *fyne.Container
@@ -91,6 +97,7 @@ type App struct {
 	topKey        string            // для какого вида построена шапка (раздел или поиск)
 	subtitle      *canvas.Text      // подзаголовок в шапке — меняется без перестройки шапки
 	selectAllBtn  *widget.Button    // «Выбрать все / Снять все» для видимых объектов
+	cleanAllBtn   *widget.Button    // «Очистить всё» в открытом разделе (в поиске его нет)
 	list          *fyne.Container   // сюда кладётся список под шапкой
 	detailsScroll *container.Scroll // прокрутка списка (чтобы сохранять позицию)
 	bottom        *fyne.Container
@@ -162,14 +169,15 @@ func Run(a fyne.App, opts Options) error {
 func (u *App) render() {
 	u.win.SetTitle(u.t("app.title"))
 
-	u.header = container.NewVBox()
+	u.banner = container.NewVBox()
 	u.details = container.NewStack() // Stack показывает свой объект на всю площадь
 	u.detailsScroll = nil
 	u.topKey = "" // шапку правой части — построить заново (например, на новом языке)
 	u.bottom = container.NewStack()
 
-	// Справа: шапка сверху, нижняя полоса снизу, подробности между ними.
-	main := edges(u.header, u.bottom, nil, nil, u.details)
+	// Справа: полоса пробного режима сверху (если он включён), нижняя
+	// полоса снизу, подробности между ними.
+	main := edges(u.banner, u.bottom, nil, nil, u.details)
 
 	// Боковая панель слева на всю высоту, как в Finder и Настройках.
 	u.win.SetContent(edges(nil, nil, u.buildSidebar(), nil, main))
@@ -179,16 +187,17 @@ func (u *App) render() {
 
 // refresh обновляет всё, что зависит от состояния провайдеров и выбора.
 func (u *App) refresh() {
-	u.fillHeader()
+	u.fillBanner()
+	u.fillDisk()
 	u.fillSidebar()
 	u.refreshDetails()
 	u.updateBottom()
 	u.relayout()
 }
 
-// relayout заново раскладывает окно. Шапка и нижняя полоса меняют высоту
-// (появилась полоса диска, выбрали объекты), а родительский Border сам
-// об этом не узнаёт — без этого шапка налезала бы на содержимое.
+// relayout заново раскладывает окно. Верхняя и нижняя полосы меняют высоту
+// (включили пробный режим, выбрали объекты), а родительская раскладка сама
+// об этом не узнаёт — без этого полосы налезали бы на содержимое.
 func (u *App) relayout() {
 	if c := u.win.Content(); c != nil {
 		c.Refresh()

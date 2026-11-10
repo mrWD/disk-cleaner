@@ -359,3 +359,122 @@ func TestAppearance(t *testing.T) {
 		}
 	})
 }
+
+func TestSwitchingViewClearsSelection(t *testing.T) {
+	t.Run("opening another section clears the checkboxes", func(t *testing.T) {
+		// Given: в разделе xcode отмечен Lingary
+		u := loaded(t)
+		_ = u.sel.Add(derived)
+		u.updateBottom()
+
+		// When: открыли раздел docker
+		u.selectProvider(1)
+
+		// Then: ничего не выбрано, и нижняя полоса это показывает
+		if u.sel.Len() != 0 {
+			t.Errorf("selection = %v, want empty after switching sections", u.sel.Items())
+		}
+		if bottom := strings.Join(texts(u.bottom), "\n"); !strings.Contains(bottom, "Nothing selected") {
+			t.Errorf("bottom bar should say Nothing selected, shows:\n%s", bottom)
+		}
+	})
+
+	t.Run("starting a global search clears them too", func(t *testing.T) {
+		u := loaded(t)
+		_ = u.sel.Add(derived)
+
+		u.setGlobalQuery("postgres")
+
+		if u.sel.Len() != 0 {
+			t.Errorf("selection = %v, want empty after starting a search", u.sel.Items())
+		}
+	})
+
+	t.Run("staying in the section keeps them", func(t *testing.T) {
+		// Given: отмечен Lingary
+		u := loaded(t)
+		_ = u.sel.Add(derived)
+
+		// When: раскрыли категорию, сменили оформление (окно перестроилось)
+		// и ещё раз открыли тот же раздел
+		u.expanded["xcode.cache"] = true
+		u.refreshDetails()
+		u.setAppearance(appearanceDark)
+		u.render()
+		u.selectProvider(0)
+
+		// Then: отметка на месте
+		if !u.sel.Contains(derived) {
+			t.Errorf("selection = %v, want Lingary kept", u.sel.Items())
+		}
+	})
+}
+
+func TestCleanAll(t *testing.T) {
+	// withCaution — тот же набор плюс объект в категории «Осторожно».
+	emulator := core.Item{ID: "e1", CategoryID: "xcode.empty", Name: "Old emulator", Size: 5_000_000}
+	withCaution := func(t *testing.T) *App {
+		u := loaded(t)
+		u.states[0].items = append(u.states[0].items, emulator)
+		u.refresh()
+		return u
+	}
+
+	t.Run("section button takes only safe items that can be selected", func(t *testing.T) {
+		u := withCaution(t)
+
+		sel := u.safeSelection(u.states[0])
+
+		if !sel.Contains(derived) || !sel.Contains(archive) || sel.Contains(emulator) || sel.Len() != 2 {
+			t.Errorf("safe selection = %v, want Lingary and SpesaPlan only", sel.Items())
+		}
+	})
+
+	t.Run("global button covers every section but skips running items", func(t *testing.T) {
+		u := withCaution(t)
+
+		sel := u.safeSelection(u.states...)
+
+		if !sel.Contains(postgres) || sel.Contains(redis) || sel.Contains(emulator) || sel.Len() != 3 {
+			t.Errorf("safe selection = %v, want Lingary, SpesaPlan and postgres", sel.Items())
+		}
+	})
+
+	t.Run("it does not touch the checkboxes on screen", func(t *testing.T) {
+		u := loaded(t)
+
+		u.cleanAll(u.states...) // откроется окно проверки; «Отмена» ничего не изменит
+
+		if u.sel.Len() != 0 {
+			t.Errorf("selection = %v, want untouched", u.sel.Items())
+		}
+	})
+
+	t.Run("buttons are off while scanning and when nothing is safe", func(t *testing.T) {
+		u := loaded(t)
+		if u.cleanEvery.Disabled() || u.cleanAllBtn.Disabled() {
+			t.Fatal("both Clean All buttons should be on when safe items are found")
+		}
+
+		// When: раздел docker снова сканируется
+		u.states[1].scanning = true
+		u.refresh()
+
+		// Then: общая кнопка ждёт конца сканирования, а кнопка раздела xcode — нет
+		if !u.cleanEvery.Disabled() {
+			t.Error("global Clean All should wait until scanning finishes")
+		}
+		if u.cleanAllBtn.Disabled() {
+			t.Error("Clean All in xcode should stay on: xcode is not scanning")
+		}
+
+		// When: в xcode осталось только «Осторожно»
+		u.states[0].items = []core.Item{emulator}
+		u.refresh()
+
+		// Then: кнопка раздела выключена
+		if !u.cleanAllBtn.Disabled() {
+			t.Error("Clean All in xcode should be off: nothing safe there")
+		}
+	})
+}
