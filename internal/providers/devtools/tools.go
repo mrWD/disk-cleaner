@@ -1,63 +1,63 @@
 package devtools
 
-// tool — описание одного инструмента разработки: как узнать, что он
-// установлен и запущен, и где лежат его файлы. Все пути — от домашней папки.
+// tool describes one development tool: how to tell that it is
+// installed and running, and where its files are. All paths are relative to the home folder.
 //
-// Чтобы раздел узнавал новый инструмент, достаточно добавить сюда запись.
+// For the section to recognize a new tool, it is enough to add an entry here.
 type tool struct {
-	name    string   // как показать: "Cursor"
-	apps    []string // имена .app в /Applications — по ним видно «установлен» и «запущен»
-	clis    []string // команды в терминале — по ним видно «установлен»
-	markers []string // ещё признаки работы в командной строке процессов
+	name    string   // how to display it: "Cursor"
+	apps    []string // names of .app in /Applications; they show "installed" and "running"
+	clis    []string // commands in the terminal; they show "installed"
+	markers []string // more signs of running, in the command lines of processes
 
-	// data — всё, что принадлежит программе. Показывается целиком,
-	// только когда программа удалена («остатки удалённых программ»).
+	// data is everything that belongs to the program. Shown in full
+	// only when the program is uninstalled ("leftovers of uninstalled apps").
 	data []string
 
-	extDir   string     // папка расширений редактора на основе VS Code
-	support  string     // Application Support приложения на Electron: кэши внутри
-	caches   []string   // кэши и временные файлы — пока программа работает, не трогаем
-	runtimes []string   // папки, где каждая подпапка — скачанная среда выполнения
-	versions *versionsT // папка с версиями CLI
-	info     []infoT    // только для информации: размер и где чистить правильно
+	extDir   string     // folder of extensions of an editor based on VS Code
+	support  string     // Application Support of an Electron app: caches inside
+	caches   []string   // caches and temporary files; not touched while the program runs
+	runtimes []string   // folders where every subfolder is a downloaded runtime
+	versions *versionsT // folder with CLI versions
+	info     []infoT    // for information only: size and where to clean it properly
 }
 
-// versionsT — где CLI хранит свои версии: каждая версия — файл или папка
-// в dir, а link — ссылка на текущую (её не трогаем).
+// versionsT is where a CLI keeps its versions: each version is a file or folder
+// in dir, and link points to the current one (we do not touch it).
 type versionsT struct {
 	dir, link string
 }
 
-// infoT — что показываем только для информации.
+// infoT is what we show for information only.
 type infoT struct {
 	path   string
-	reason string // ключ перевода: где это чистить правильно
+	reason string // translation key: where to clean this properly
 }
 
-// Пути внутри ~/Library, которые встречаются часто.
+// Paths inside ~/Library that come up often.
 const (
 	support = "Library/Application Support/"
 	caches  = "Library/Caches/"
 )
 
-// tools — все инструменты, которые знает раздел. Порядок — порядок строк.
+// tools are all the tools the section knows. The order is the order of the rows.
 var tools = []tool{
 	{
 		name: "Claude",
 		apps: []string{"Claude"},
-		// Данные приложения Claude трогать по частям нельзя: можно потерять
-		// сессии. Только показываем, сколько занимают, и где их чистить.
+		// We must not touch Claude app data piece by piece: we could lose
+		// sessions. We only show how much space it takes and where to clean it.
 		info: []infoT{{support + "Claude", reasonClaudeApp}},
 	},
 	{
 		name: "Claude Code",
 		clis: []string{"claude"},
-		// Claude Code запускается и из терминала, и из приложения Claude.
+		// Claude Code is launched both from the terminal and from the Claude app.
 		markers:  []string{"/.local/share/claude/versions/", "/Claude/claude-code/"},
 		versions: &versionsT{dir: ".local/share/claude/versions", link: ".local/bin/claude"},
 		caches:   []string{caches + "claude-cli-nodejs"},
-		// ~/.claude — настройки и история; его использует и Claude в приложении,
-		// поэтому он никогда не считается «остатками».
+		// ~/.claude is settings and history; the Claude app uses it too,
+		// so it never counts as "leftovers".
 		data: []string{".local/share/claude", caches + "claude-cli-nodejs"},
 		info: []infoT{{".claude/projects", reasonClaudeHistory}},
 	},
@@ -167,27 +167,27 @@ var tools = []tool{
 	{name: "Goose", clis: []string{"goose"}, data: []string{".config/goose", ".local/share/goose"}},
 }
 
-// electronCaches — папки внутри Application Support приложений на Electron
-// (VS Code, Cursor, Orca…), которые приложение пересоздаёт само. User/ и
-// workspaceStorage сюда не входят: там настройки, состояние проектов и
-// (в Cursor) история чатов.
+// electronCaches are folders inside Application Support of Electron apps
+// (VS Code, Cursor, Orca…) that the app recreates itself. User/ and
+// workspaceStorage are not included: they hold settings, project state and
+// (in Cursor) chat history.
 var electronCaches = []string{
 	"Cache", "CachedData", "Code Cache", "GPUCache", "DawnGraphiteCache",
 	"DawnWebGPUCache", "logs", "CachedExtensionVSIXs",
 }
 
-// product — IDE, которая хранит настройки отдельно для каждой версии:
-// ~/Library/Application Support/JetBrains/IntelliJIdea2024.2 и т.п.
+// product is an IDE that keeps settings separately for each version:
+// ~/Library/Application Support/JetBrains/IntelliJIdea2024.2 and so on.
 type product struct {
 	name   string   // "IntelliJ IDEA"
-	prefix string   // начало имени папки: "IntelliJIdea"
-	apps   []string // варианты имени .app
+	prefix string   // start of the folder name: "IntelliJIdea"
+	apps   []string // variants of the .app name
 }
 
-// versioned — где такие IDE держат папки версий. У JetBrains — в трёх
-// местах (настройки, кэши, логи), у Android Studio — только настройки
-// (её кэши лежат внутри ~/Library/Caches/Google вместе с кэшем Chrome,
-// а тот относится к разделу «Кэши приложений»).
+// versioned is where such IDEs keep version folders. JetBrains uses three
+// places (settings, caches, logs), Android Studio only settings
+// (its caches live inside ~/Library/Caches/Google together with the Chrome cache,
+// and that belongs to the "App caches & logs" section).
 var versioned = []struct {
 	dirs     []string
 	products []product

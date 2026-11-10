@@ -11,7 +11,7 @@ import (
 	"disk-cleaner/internal/providers/providertest"
 )
 
-// write создаёт файл заданного размера (и все папки до него).
+// write creates a file of a given size (and all folders leading to it).
 func write(t *testing.T, path string, size int) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -19,14 +19,14 @@ func write(t *testing.T, path string, size int) {
 	}
 	data := make([]byte, size)
 	for i := range data {
-		data[i] = 1 // не нули, чтобы APFS не сделал файл «разреженным»
+		data[i] = 1 // not zeros, so that APFS does not make the file "sparse"
 	}
 	if err := os.WriteFile(path, data, 0o644); err != nil {
 		t.Fatal(err)
 	}
 }
 
-// writeText создаёт текстовый файл.
+// writeText creates a text file.
 func writeText(t *testing.T, path, text string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -39,20 +39,20 @@ func writeText(t *testing.T, path, text string) {
 
 const mb = 1_000_000
 
-// fakeHome — домашняя папка, похожая на эту машину: модели во всех
-// местах, где их кладут LM Studio, Ollama, Hugging Face, Lingary,
-// Argos Translate и llmstore.
+// fakeHome is a home folder that looks like this machine: models in all
+// the places where LM Studio, Ollama, Hugging Face, Lingary,
+// Argos Translate and llmstore put them.
 func fakeHome(t *testing.T, processes ...string) *Provider {
 	t.Helper()
 	home := t.TempDir()
 	p := &Provider{home: home, processes: func(context.Context) []string { return processes }}
 
-	// LM Studio: папка загрузок указана в settings.json.
+	// LM Studio: the downloads folder is set in settings.json.
 	lms := filepath.Join(home, "lmstudio-models")
 	writeText(t, filepath.Join(home, ".lmstudio", "settings.json"), `{"downloadsFolder": "`+lms+`"}`)
 	write(t, filepath.Join(lms, "lmstudio-community", "Qwen3-8B-GGUF", "Qwen3-8B-Q4_K_M.gguf"), 2*mb)
 
-	// Ollama: две модели делят слой A (веса), у каждой свой слой параметров.
+	// Ollama: two models share layer A (the weights), each has its own parameters layer.
 	ollama := filepath.Join(home, ".ollama", "models")
 	write(t, filepath.Join(ollama, "blobs", "sha256-aaa"), 3*mb)
 	write(t, filepath.Join(ollama, "blobs", "sha256-bbb"), 10)
@@ -69,7 +69,7 @@ func fakeHome(t *testing.T, processes ...string) *Provider {
 	write(t, filepath.Join(home, ".cache", "huggingface", "hub",
 		"models--sentence-transformers--paraphrase-multilingual-MiniLM-L12-v2", "blobs", "x"), 2*mb)
 
-	// Lingary: модель в папке models, рядом мелкий state.json.
+	// Lingary: a model in the models folder, with a small state.json next to it.
 	lingary := filepath.Join(home, "Library", "Application Support", "Lingary", "models")
 	write(t, filepath.Join(lingary, "gguf", "Qwen3-8B-Q4_K_M.gguf"), 2*mb)
 	writeText(t, filepath.Join(lingary, "state.json"), `{}`)
@@ -86,7 +86,7 @@ func fakeHome(t *testing.T, processes ...string) *Provider {
 	return p
 }
 
-// byName — объект по имени (или пустой).
+// byName returns an item by name (or an empty one).
 func byName(items []core.Item, name string) core.Item {
 	i := slices.IndexFunc(items, func(it core.Item) bool { return it.Name == name })
 	if i < 0 {
@@ -133,20 +133,20 @@ func TestScanFindsModelsEverywhere(t *testing.T) {
 
 func TestOllama(t *testing.T) {
 	t.Run("deleting a model keeps layers that another model still needs", func(t *testing.T) {
-		// Given: qwen2.5:0.5b и qwen2.5:latest делят веса (sha256-aaa)
+		// Given: qwen2.5:0.5b and qwen2.5:latest share the weights (sha256-aaa)
 		p := fakeHome(t)
 		items, _ := p.Scan(context.Background())
 		small := byName(items, "qwen2.5:0.5b")
 
-		// Then: размер — только собственный слой, без общих весов
+		// Then: the size is only its own layer, without the shared weights
 		if small.Size != 10 {
 			t.Errorf("size = %s, want 10 B (shared weights are not freed)", small.Size)
 		}
 
-		// When: план удаления
+		// When: the deletion plan
 		actions, _ := p.Plan([]core.Item{small})
 
-		// Then: манифест и свой слой, но не общие веса
+		// Then: the manifest and its own layer, but not the shared weights
 		var paths []string
 		for _, a := range actions {
 			paths = append(paths, filepath.Base(a.RemovePath))
@@ -157,7 +157,7 @@ func TestOllama(t *testing.T) {
 	})
 
 	t.Run("a model loaded into memory cannot be selected", func(t *testing.T) {
-		// Given: процесс ollama runner держит веса
+		// Given: an ollama runner process holds the weights
 		p := fakeHome(t)
 		blob := filepath.Join(p.home, ".ollama", "models", "blobs", "sha256-aaa")
 		p.processes = func(context.Context) []string {
@@ -183,7 +183,7 @@ func TestAppModels(t *testing.T) {
 		if ok || why.Key != reasonAppRunning || why.Args["App"] != "Lingary" {
 			t.Errorf("Lingary model: ok = %v, why = %+v", ok, why)
 		}
-		// Модели других приложений это не затрагивает.
+		// This does not affect the models of other apps.
 		if ok, _ := byName(items, "Argos Translate · translate-en_ru-1_9/model/model.bin").CanSelect(); !ok {
 			t.Error("Argos model should stay selectable")
 		}

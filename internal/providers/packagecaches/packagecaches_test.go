@@ -12,7 +12,7 @@ import (
 	"disk-cleaner/internal/providers/providertest"
 )
 
-// fakeHome — временная домашняя папка с кэшами и фейковый список процессов.
+// fakeHome is a temporary home folder with caches and a fake process list.
 func fakeHome(t *testing.T, processes []string, caches ...string) *Provider {
 	t.Helper()
 	home := t.TempDir()
@@ -37,13 +37,13 @@ func TestScan(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("finds existing caches and skips missing ones", func(t *testing.T) {
-		// Given: есть только кэши npm и Gradle
+		// Given: there are only npm and Gradle caches
 		p := fakeHome(t, nil, ".npm/_cacache", ".gradle/caches")
 
 		// When
 		items, _ := p.Scan(ctx)
 
-		// Then: ровно два объекта, оба можно выбрать
+		// Then: exactly two items, both can be selected
 		if len(items) != 2 {
 			t.Fatalf("items = %+v, want npm and Gradle", items)
 		}
@@ -56,14 +56,14 @@ func TestScan(t *testing.T) {
 	})
 
 	t.Run("Gradle cache cannot be cleaned while a Gradle daemon runs", func(t *testing.T) {
-		// Given: среди процессов есть демон Gradle
+		// Given: among the processes there is a Gradle daemon
 		daemon := "/usr/bin/java -Xmx2g org.gradle.launcher.daemon.bootstrap.GradleDaemon 8.10"
 		p := fakeHome(t, []string{daemon}, ".gradle/caches", ".npm/_cacache")
 
 		// When
 		items, _ := p.Scan(ctx)
 
-		// Then: Gradle — Running, npm по-прежнему можно выбрать
+		// Then: Gradle is Running, npm can still be selected
 		for _, it := range items {
 			wantRunning := it.CategoryID == "packagecaches.gradle"
 			if (it.Status == core.StatusRunning) != wantRunning {
@@ -74,7 +74,7 @@ func TestScan(t *testing.T) {
 }
 
 func TestNpxAndGradleJDKArchives(t *testing.T) {
-	// Given: кэш npx и два архива JDK от Gradle рядом с распакованным JDK
+	// Given: an npx cache and two JDK archives from Gradle next to an unpacked JDK
 	p := fakeHome(t, nil, ".npm/_npx/abc123", ".gradle/jdks/eclipse_adoptium-17-aarch64-os_x.2")
 	for _, name := range []string{"OpenJDK17U-jdk.tar.gz", "OpenJDK21U-jdk.tar.gz"} {
 		if err := os.WriteFile(filepath.Join(p.home, ".gradle", "jdks", name), []byte("x"), 0o644); err != nil {
@@ -85,7 +85,7 @@ func TestNpxAndGradleJDKArchives(t *testing.T) {
 	// When
 	items, _ := p.Scan(context.Background())
 
-	// Then: npx и оба архива есть, а распакованного JDK — нет
+	// Then: npx and both archives are there, but the unpacked JDK is not
 	var names []string
 	for _, it := range items {
 		names = append(names, it.Name)
@@ -98,8 +98,8 @@ func TestNpxAndGradleJDKArchives(t *testing.T) {
 }
 
 func TestLibraryCachesHaveOneOwner(t *testing.T) {
-	// Каждая папка ~/Library/Caches этого провайдера должна быть в общем
-	// списке kit.LibraryCachesOwned — иначе её покажет ещё и «Кэши приложений».
+	// Every ~/Library/Caches folder of this provider must be in the shared
+	// kit.LibraryCachesOwned list, otherwise "App caches & logs" will show it too.
 	for _, c := range caches {
 		for _, f := range c.folders {
 			dir, name := filepath.Split(f.path)

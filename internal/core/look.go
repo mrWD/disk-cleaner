@@ -1,16 +1,16 @@
 package core
 
-// Look — как провайдер выглядит в списке слева: значок и цвет плашки
-// под ним, как у разделов в Системных настройках macOS.
+// Look is how a provider looks in the list on the left: an icon and the
+// colour of the tile behind it, like the sections in macOS System Settings.
 //
-// Это необязательный интерфейс: провайдер может его не реализовывать,
-// тогда UI нарисует значок по умолчанию. Проверка в UI выглядит так:
+// This is an optional interface: a provider may not implement it,
+// and then the UI draws a default icon. The check in the UI looks like this:
 //
 //	if l, ok := p.(core.Look); ok { icon, color := l.Look() }
 //
-// Значок — SVG белого цвета (рисуется поверх цветной плашки),
-// цвет — строка вида "#007AFF". Простые данные, а не типы Fyne,
-// чтобы провайдеры не зависели от библиотеки интерфейса.
+// The icon is a white SVG (drawn on top of the coloured tile),
+// the colour is a string like "#007AFF". Plain data, not Fyne types,
+// so that providers don't depend on the UI library.
 type Look interface {
 	Look() (icon []byte, color string)
 }

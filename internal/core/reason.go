@@ -1,18 +1,18 @@
 package core
 
-// Reason — причина, почему объект нельзя трогать.
+// Reason is why an item must not be touched.
 //
-// Ядро не хранит готовый текст на каком-то языке: только ключ перевода
-// и значения для подстановки. Текст на нужном языке соберёт UI.
-// Так ядро не зависит от языка интерфейса.
+// The core doesn't store ready-made text in any language: only a translation
+// key and the values to substitute. The UI assembles the text in the right language.
+// This way the core doesn't depend on the interface language.
 type Reason struct {
-	Key  string         // ключ перевода, например "simulators.shared_image"
-	Args map[string]any // подстановки в текст: {"Runtime": "iOS 27.0"}
+	Key  string         // translation key, for example "simulators.shared_image"
+	Args map[string]any // values substituted into the text: {"Runtime": "iOS 27.0"}
 }
 
-// Ключи причин, которые знает само ядро. Их переводы лежат
-// в переводах интерфейса (internal/ui/translations).
-// const — значения, известные ещё при компиляции. Менять их нельзя.
+// Reason keys that the core itself knows. Their translations live
+// in the interface translations (internal/ui/translations).
+// const values are known at compile time. They can't be changed.
 const (
 	ReasonRunning = "core.reason.running"
 	ReasonInUse   = "core.reason.in_use"

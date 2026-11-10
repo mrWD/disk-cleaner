@@ -1,33 +1,33 @@
 package core
 
-// Risk — насколько безопасно чистить категорию.
+// Risk is how safe it is to clean a category.
 type Risk int
 
 const (
-	// RiskSafe — пересоздаётся само, ничего не теряется.
-	// Пример: DerivedData, кэш npm.
+	// RiskSafe means it gets recreated by itself and nothing is lost.
+	// Example: DerivedData, the npm cache.
 	RiskSafe Risk = iota
 
-	// RiskCaution — потеряется состояние, которое придётся восстанавливать
-	// руками или долго скачивать. Пример: симуляторы, эмуляторы Android.
+	// RiskCaution means some state is lost that you would have to restore
+	// by hand or download for a long time. Example: simulators, Android emulators.
 	RiskCaution
 )
 
-// Category — группа объектов одного вида с объяснением для пользователя.
+// Category is a group of items of one kind, with an explanation for the user.
 //
-// Тексты лежат в переводах провайдера по ключам от ID:
+// The texts live in the provider's translations under keys built from the ID:
 //
-//	<ID>.title — заголовок:                "Derived Data"
-//	<ID>.what  — что это такое
-//	<ID>.why   — почему это можно удалить
-//	<ID>.after — что будет после удаления
+//	<ID>.title — the heading:               "Derived Data"
+//	<ID>.what  — what it is
+//	<ID>.why   — why it's safe to delete
+//	<ID>.after — what happens after deleting
 type Category struct {
-	ID   string // "xcode.derived_data": сначала провайдер, потом категория
+	ID   string // "xcode.derived_data": provider first, then the category
 	Risk Risk
 }
 
-// Методы ниже собирают ключи переводов, чтобы строка ".what"
-// не повторялась по всему коду с риском опечатки.
+// The methods below build the translation keys, so that the string ".what"
+// isn't repeated all over the code with a risk of typos.
 func (c Category) TitleKey() string { return c.ID + ".title" }
 func (c Category) WhatKey() string  { return c.ID + ".what" }
 func (c Category) WhyKey() string   { return c.ID + ".why" }

@@ -9,29 +9,29 @@ import (
 	"fyne.io/fyne/v2/theme"
 )
 
-// Тема в духе приложений Apple: системные цвета macOS (из Human Interface
-// Guidelines), шрифт San Francisco, мелкий кегль 13 pt и скругления.
+// A theme in the spirit of Apple apps: macOS system colours (from the Human Interface
+// Guidelines), the San Francisco font, a small 13 pt text size and rounded corners.
 //
-// Тема в Fyne — это тип с четырьмя методами: Color, Font, Icon, Size.
-// Fyne спрашивает у темы цвет или размер по имени и сам перерисовывает
-// всё, когда macOS переключается между светлым и тёмным видом.
+// A theme in Fyne is a type with four methods: Color, Font, Icon, Size.
+// Fyne asks the theme for a colour or a size by name and redraws
+// everything itself when macOS switches between light and dark.
 
-// Свои имена цветов и размеров — в дополнение к стандартным Fyne.
-// Тема умеет отвечать и на них, поэтому их можно указывать у текста.
+// Our own colour and size names, in addition to the standard Fyne ones.
+// The theme can answer them too, so they can be used on text.
 const (
-	colorSidebar    fyne.ThemeColorName = "dc.sidebar"    // фон боковой панели и нижней полосы
-	colorCard       fyne.ThemeColorName = "dc.card"       // фон «сгруппированных» плашек
-	colorCardStroke fyne.ThemeColorName = "dc.cardStroke" // тонкая рамка плашек
-	colorSecondary  fyne.ThemeColorName = "dc.secondary"  // второстепенный текст (серый)
-	colorTrack      fyne.ThemeColorName = "dc.track"      // свободная часть полосы диска
-	colorUsed       fyne.ThemeColorName = "dc.used"       // занятая «прочим» часть полосы
-	colorCode       fyne.ThemeColorName = "dc.code"       // фон блока с командами
+	colorSidebar    fyne.ThemeColorName = "dc.sidebar"    // background of the sidebar and the bottom strip
+	colorCard       fyne.ThemeColorName = "dc.card"       // background of the "grouped" cards
+	colorCardStroke fyne.ThemeColorName = "dc.cardStroke" // thin border of the cards
+	colorSecondary  fyne.ThemeColorName = "dc.secondary"  // secondary text (grey)
+	colorTrack      fyne.ThemeColorName = "dc.track"      // the free part of the disk bar
+	colorUsed       fyne.ThemeColorName = "dc.used"       // the part of the bar used by "other" data
+	colorCode       fyne.ThemeColorName = "dc.code"       // background of the block with commands
 
-	sizeTitle   fyne.ThemeSizeName = "dc.title"   // крупный заголовок раздела
-	sizeCaption fyne.ThemeSizeName = "dc.caption" // мелкие подписи
+	sizeTitle   fyne.ThemeSizeName = "dc.title"   // large section title
+	sizeCaption fyne.ThemeSizeName = "dc.caption" // small captions
 )
 
-// palette — набор цветов для одного вида (светлого или тёмного).
+// palette is a set of colours for one appearance (light or dark).
 type palette struct {
 	background, sidebar, card, cardStroke, separator color.Color
 	label, secondary, tertiary                       color.Color
@@ -40,15 +40,15 @@ type palette struct {
 	overlay, track, used, code                       color.Color
 }
 
-// hex превращает "#RRGGBB" или "#RRGGBBAA" в цвет. Ошибок не бывает:
-// строки заданы прямо в коде.
+// hex turns "#RRGGBB" or "#RRGGBBAA" into a colour. There can be no errors:
+// the strings are set right in the code.
 func hex(s string) color.NRGBA {
 	var c color.NRGBA
 	c.A = 0xff
 	v := func(i int) uint8 {
 		var n uint8
 		for _, r := range s[i : i+2] {
-			n <<= 4 // сдвиг на 4 бита = умножить на 16
+			n <<= 4 // shifting by 4 bits = multiplying by 16
 			switch {
 			case r >= '0' && r <= '9':
 				n |= uint8(r - '0')
@@ -67,7 +67,7 @@ func hex(s string) color.NRGBA {
 	return c
 }
 
-// Цвета светлого вида macOS.
+// Colours of the macOS light appearance.
 var lightPalette = palette{
 	background: hex("#F5F5F7"), sidebar: hex("#ECECEF"), card: hex("#FFFFFF"),
 	cardStroke: hex("#00000014"), separator: hex("#0000001A"),
@@ -78,7 +78,7 @@ var lightPalette = palette{
 	track: hex("#E5E5EA"), used: hex("#AEAEB2"), code: hex("#F2F2F4"),
 }
 
-// Цвета тёмного вида macOS.
+// Colours of the macOS dark appearance.
 var darkPalette = palette{
 	background: hex("#1C1C1E"), sidebar: hex("#252527"), card: hex("#2C2C2E"),
 	cardStroke: hex("#FFFFFF12"), separator: hex("#FFFFFF1A"),
@@ -89,16 +89,16 @@ var darkPalette = palette{
 	track: hex("#3A3A3C"), used: hex("#636366"), code: hex("#1C1C1E"),
 }
 
-// Оформление, которое можно выбрать в настройках.
+// The appearance options that can be chosen in settings.
 const (
-	appearanceSystem = ""      // как в macOS
-	appearanceLight  = "light" // всегда светлое
-	appearanceDark   = "dark"  // всегда тёмное
+	appearanceSystem = ""      // same as macOS
+	appearanceLight  = "light" // always light
+	appearanceDark   = "dark"  // always dark
 )
 
-// applyAppearance выбирает светлый или тёмный вид и заново применяет тему.
-// Fyne перерисует все стандартные виджеты (кнопки, поля, галочки),
-// а слушатель настроек в New перестроит наши плашки и надписи.
+// applyAppearance picks the light or dark look and applies the theme again.
+// Fyne will redraw all standard widgets (buttons, fields, checkboxes),
+// and the settings listener in New will rebuild our cards and labels.
 func (u *App) applyAppearance(mode string) {
 	switch mode {
 	case appearanceLight:
@@ -108,12 +108,12 @@ func (u *App) applyAppearance(mode string) {
 		v := theme.VariantDark
 		u.theme.forced = &v
 	default:
-		u.theme.forced = nil // вид берётся из macOS
+		u.theme.forced = nil // the look is taken from macOS
 	}
 	u.app.Settings().SetTheme(u.theme)
 }
 
-// isDark — тёмный ли вид сейчас (с учётом выбора в настройках).
+// isDark reports whether the look is dark right now (taking the choice in settings into account).
 func (u *App) isDark() bool {
 	if u.theme.forced != nil {
 		return *u.theme.forced == theme.VariantDark
@@ -121,23 +121,23 @@ func (u *App) isDark() bool {
 	return u.app.Settings().ThemeVariant() == theme.VariantDark
 }
 
-// setAppearance — выбор в настройках: запомнить и сразу применить.
+// setAppearance handles the choice in settings: remember it and apply it at once.
 func (u *App) setAppearance(mode string) {
 	u.opts.Settings.SetAppearance(mode)
 	u.applyAppearance(mode)
 }
 
-// appleTheme — наша тема. Шрифты читаются с диска один раз при создании.
+// appleTheme is our theme. Fonts are read from disk once, when it is created.
 type appleTheme struct {
 	regular, bold, mono fyne.Resource
 
-	// forced — если не nil, вид всегда этот (нужно для снимков экрана
-	// тёмной темы в тестах). В обычной работе вид берётся из macOS.
+	// forced, if not nil, fixes the look to this value (needed for screenshots
+	// of the dark theme in tests). In normal use the look is taken from macOS.
 	forced *fyne.ThemeVariant
 }
 
-// newAppleTheme ищет шрифты San Francisco. Если их нет (на другом
-// компьютере), остаются шрифты Fyne по умолчанию.
+// newAppleTheme looks for the San Francisco fonts. If they are missing (on another
+// computer), the default Fyne fonts stay.
 func newAppleTheme() *appleTheme {
 	return &appleTheme{
 		regular: loadFont("SF-Pro-Text-Regular.otf", "SFNS.ttf"),
@@ -146,9 +146,9 @@ func newAppleTheme() *appleTheme {
 	}
 }
 
-// loadFont возвращает первый найденный из файлов шрифта или nil.
-// Шрифты берутся из системы этого Mac, а не кладутся в программу:
-// лицензия Apple не разрешает их распространять.
+// loadFont returns the first one found among the font files, or nil.
+// The fonts are taken from this Mac's system and are not shipped with the program:
+// Apple's licence does not allow distributing them.
 func loadFont(names ...string) fyne.Resource {
 	home, _ := os.UserHomeDir()
 	dirs := []string{"/Library/Fonts", filepath.Join(home, "Library", "Fonts"), "/System/Library/Fonts"}
@@ -163,7 +163,7 @@ func loadFont(names ...string) fyne.Resource {
 	return nil
 }
 
-// palette — цвета для нужного вида.
+// palette returns the colours for the needed appearance.
 func (t *appleTheme) palette(v fyne.ThemeVariant) palette {
 	if t.forced != nil {
 		v = *t.forced
@@ -174,7 +174,7 @@ func (t *appleTheme) palette(v fyne.ThemeVariant) palette {
 	return lightPalette
 }
 
-// Color — цвет по имени. Всё, что не знаем, отдаём стандартной теме Fyne.
+// Color returns a colour by name. Anything we don't know goes to the standard Fyne theme.
 func (t *appleTheme) Color(name fyne.ThemeColorName, v fyne.ThemeVariant) color.Color {
 	p := t.palette(v)
 
@@ -238,8 +238,8 @@ func (t *appleTheme) Color(name fyne.ThemeColorName, v fyne.ThemeVariant) color.
 	return theme.DefaultTheme().Color(name, v)
 }
 
-// Font — шрифт для стиля текста. Жирный у Apple в интерфейсе — полужирный
-// (Semibold), его и берём.
+// Font returns the font for a text style. Bold in Apple's interface is semibold
+// (Semibold), so that is what we take.
 func (t *appleTheme) Font(style fyne.TextStyle) fyne.Resource {
 	switch {
 	case style.Monospace && t.mono != nil:
@@ -252,12 +252,12 @@ func (t *appleTheme) Font(style fyne.TextStyle) fyne.Resource {
 	return theme.DefaultTheme().Font(style)
 }
 
-// Icon — значки берём стандартные.
+// Icon: we use the standard icons.
 func (t *appleTheme) Icon(name fyne.ThemeIconName) fyne.Resource {
 	return theme.DefaultTheme().Icon(name)
 }
 
-// Size — размеры: текст 13 pt, как в macOS, и аккуратные скругления.
+// Size: text is 13 pt, as in macOS, with neat rounded corners.
 func (t *appleTheme) Size(name fyne.ThemeSizeName) float32 {
 	switch name {
 	case theme.SizeNameText:

@@ -1,15 +1,15 @@
-// Package simulators — провайдер симуляторов Xcode: версии систем
-// (runtimes), сами симуляторы (devices) и кэш dyld.
+// Package simulators is the provider for Xcode simulators: OS versions
+// (runtimes), the simulators themselves (devices) and the dyld cache.
 //
-// Здесь живут правила, выученные на ошибках 08.11.2026:
-//   - Несколько записей runtime могут указывать на ОДИН образ на диске
-//     (так было с тремя записями iOS 27.0). Удалишь «лишнюю» — пропадёт
-//     и рабочая. Такие записи защищены.
-//   - Симулятор, у которого временно «потерялась» версия системы, выглядит
-//     недоступным, и xcrun simctl delete unavailable удаляет его вместе
-//     с данными. Здесь такие симуляторы защищены.
-//   - Самую новую версию каждой платформы тоже не даём удалить:
-//     без неё Xcode не сможет запустить ни одного симулятора.
+// The rules here were learned from the mistakes of Nov 8, 2026:
+//   - Several runtime entries can point to ONE image on disk
+//     (that happened with three iOS 27.0 entries). Delete the "extra" one and
+//     the working one disappears too. Such entries are protected.
+//   - A simulator whose OS version has temporarily "gone missing" looks
+//     unavailable, and xcrun simctl delete unavailable deletes it together
+//     with its data. Such simulators are protected here.
+//   - We also do not let you delete the newest version of each platform:
+//     without it Xcode cannot start any simulator.
 package simulators
 
 import (
@@ -39,7 +39,7 @@ const (
 	catDevices  = "simulators.devices"
 	catDyld     = "simulators.dyld_cache"
 
-	// Причины защиты и недоступности (тексты в translations).
+	// Reasons for protection and unavailability (texts are in translations).
 	reasonSharedImage    = "simulators.shared_image"
 	reasonNewestRuntime  = "simulators.newest_runtime"
 	reasonNotDeletable   = "simulators.not_deletable"
@@ -50,13 +50,13 @@ const (
 	xcrun = "/usr/bin/xcrun"
 )
 
-// Provider спрашивает симуляторы через xcrun simctl.
+// Provider asks about simulators through xcrun simctl.
 type Provider struct {
-	run      shell.Runner // запуск xcrun; в тестах — фейк с записанным JSON
-	dyldRoot string       // где лежит кэш dyld; в тестах — временная папка
+	run      shell.Runner // runs xcrun; in tests, a fake with recorded JSON
+	dyldRoot string       // where the dyld cache lives; in tests, a temp folder
 }
 
-// New — провайдер для этого компьютера.
+// New is the provider for this computer.
 func New() *Provider {
 	return &Provider{run: shell.Run, dyldRoot: "/Library/Developer/CoreSimulator/Caches/dyld"}
 }
@@ -67,27 +67,27 @@ func (p *Provider) Translations() embed.FS { return translations }
 
 func (p *Provider) Categories() []core.Category {
 	return []core.Category{
-		{ID: catRuntimes, Risk: core.RiskCaution}, // скачивать заново ~8 ГБ
-		{ID: catDevices, Risk: core.RiskCaution},  // теряются установленные приложения и их данные
+		{ID: catRuntimes, Risk: core.RiskCaution}, // re-downloading is ~8 GB
+		{ID: catDevices, Risk: core.RiskCaution},  // installed apps and their data are lost
 		{ID: catDyld, Risk: core.RiskSafe},
 	}
 }
 
-// runtimeJSON — одна запись из xcrun simctl runtime list -j.
-// Теги `json:"..."` говорят, как поле называется в JSON.
+// runtimeJSON is one entry from xcrun simctl runtime list -j.
+// The `json:"..."` tags say what the field is called in JSON.
 type runtimeJSON struct {
 	Identifier         string `json:"identifier"`
 	Version            string `json:"version"`
 	Build              string `json:"build"`
 	State              string `json:"state"`
 	SizeBytes          int64  `json:"sizeBytes"`
-	Path               string `json:"path"` // путь к образу на диске
+	Path               string `json:"path"` // path to the image on disk
 	PlatformIdentifier string `json:"platformIdentifier"`
 	RuntimeIdentifier  string `json:"runtimeIdentifier"`
 	Deletable          bool   `json:"deletable"`
 }
 
-// deviceJSON — один симулятор из xcrun simctl list devices -j.
+// deviceJSON is one simulator from xcrun simctl list devices -j.
 type deviceJSON struct {
 	UDID              string `json:"udid"`
 	Name              string `json:"name"`
@@ -112,13 +112,13 @@ func (p *Provider) Scan(ctx context.Context) ([]core.Item, error) {
 		return nil, core.Unavailable(reasonNoXcode)
 	}
 
-	// runtime list -j — словарь «ID → запись».
+	// runtime list -j is a dictionary "ID → entry".
 	var runtimes map[string]runtimeJSON
 	if err := json.Unmarshal(runtimesOut, &runtimes); err != nil {
 		return nil, fmt.Errorf("simctl runtime list: %w", err)
 	}
 
-	// list devices -j — {"devices": {"<ID версии>": [симуляторы…]}}.
+	// list devices -j is {"devices": {"<runtime ID>": [simulators…]}}.
 	var devices struct {
 		Devices map[string][]deviceJSON `json:"devices"`
 	}
@@ -133,16 +133,16 @@ func (p *Provider) Scan(ctx context.Context) ([]core.Item, error) {
 	return items, nil
 }
 
-// runtimeItems — объекты для версий систем и их защита.
+// runtimeItems builds the items for OS versions and protects them.
 func runtimeItems(runtimes map[string]runtimeJSON, devices map[string][]deviceJSON) []core.Item {
-	// Сколько записей указывают на каждый образ на диске.
+	// How many entries point to each image on disk.
 	byImage := map[string]int{}
 	for _, r := range runtimes {
 		byImage[r.Path]++
 	}
 
-	// Самая новая версия каждой платформы.
-	newest := map[string]string{} // платформа → версия
+	// The newest version of each platform.
+	newest := map[string]string{} // platform → version
 	for _, r := range runtimes {
 		if cur, ok := newest[r.PlatformIdentifier]; !ok || compareVersions(r.Version, cur) > 0 {
 			newest[r.PlatformIdentifier] = r.Version
@@ -160,7 +160,7 @@ func runtimeItems(runtimes map[string]runtimeJSON, devices map[string][]deviceJS
 			Size:       core.Bytes(r.SizeBytes),
 		}
 
-		// Запущен ли симулятор на этой версии.
+		// Whether a simulator is running on this version.
 		for _, d := range devices[r.RuntimeIdentifier] {
 			if d.State == "Booted" {
 				it.Status = core.StatusRunning
@@ -168,7 +168,7 @@ func runtimeItems(runtimes map[string]runtimeJSON, devices map[string][]deviceJS
 			}
 		}
 
-		// Защита — от самой важной причины к менее важной.
+		// Protection goes from the most important reason to the less important one.
 		switch {
 		case byImage[r.Path] > 1:
 			it.Protected = &core.Reason{Key: reasonSharedImage, Args: map[string]any{"Count": byImage[r.Path]}}
@@ -185,7 +185,7 @@ func runtimeItems(runtimes map[string]runtimeJSON, devices map[string][]deviceJS
 	return items
 }
 
-// deviceItems — объекты для симуляторов.
+// deviceItems builds the items for simulators.
 func (p *Provider) deviceItems(ctx context.Context, devices map[string][]deviceJSON) []core.Item {
 	var items []core.Item
 
@@ -193,8 +193,8 @@ func (p *Provider) deviceItems(ctx context.Context, devices map[string][]deviceJ
 		for _, d := range list {
 			size := core.Bytes(d.DataPathSize)
 			if size == 0 && d.DataPath != "" {
-				// Старый Xcode не отдаёт размер — считаем сами
-				// (папка симулятора — на уровень выше data).
+				// Old Xcode does not report the size, so we count it ourselves
+				// (the simulator folder is one level above data).
 				size, _ = diskutil.DirSize(ctx, filepath.Dir(d.DataPath))
 			}
 
@@ -209,8 +209,8 @@ func (p *Provider) deviceItems(ctx context.Context, devices map[string][]deviceJ
 				it.Status = core.StatusRunning
 			}
 			if !d.IsAvailable {
-				// Тот самый случай: версия системы временно не найдена.
-				// Удалять такой симулятор — терять его данные навсегда.
+				// That exact case: the OS version is temporarily not found.
+				// Deleting such a simulator means losing its data for good.
 				it.Protected = &core.Reason{Key: reasonRuntimeMissing}
 			}
 			items = append(items, it)
@@ -221,7 +221,7 @@ func (p *Provider) deviceItems(ctx context.Context, devices map[string][]deviceJ
 	return items
 }
 
-// dyldItems — кэш dyld: <dyldRoot>/<сборка macOS>/<версия симулятора>.
+// dyldItems is the dyld cache: <dyldRoot>/<macOS build>/<simulator version>.
 func (p *Provider) dyldItems(ctx context.Context) []core.Item {
 	var paths []string
 	for _, host := range kit.Subfolders(p.dyldRoot) {
@@ -243,7 +243,7 @@ func (p *Provider) Plan(items []core.Item) ([]core.Action, error) {
 		case catDevices:
 			actions = append(actions, core.Action{Command: []string{xcrun, "simctl", "delete", it.ID}})
 		case catDyld:
-			// Кэш dyld принадлежит root — нужен пароль администратора.
+			// The dyld cache belongs to root, so it needs the administrator password.
 			actions = append(actions, core.Action{RemovePath: it.ID, NeedsAdmin: true})
 		}
 	}
@@ -251,7 +251,7 @@ func (p *Provider) Plan(items []core.Item) ([]core.Action, error) {
 	return actions, nil
 }
 
-// platformNames — человеческие имена платформ.
+// platformNames are human-readable platform names.
 var platformNames = map[string]string{
 	"com.apple.platform.iphonesimulator":  "iOS",
 	"com.apple.platform.appletvsimulator": "tvOS",
@@ -268,7 +268,7 @@ func runtimeName(r runtimeJSON) string {
 	return fmt.Sprintf("%s %s (%s)", platform, r.Version, r.Build)
 }
 
-// runtimeIDRe разбирает "com.apple.CoreSimulator.SimRuntime.iOS-18-4".
+// runtimeIDRe parses "com.apple.CoreSimulator.SimRuntime.iOS-18-4".
 var runtimeIDRe = regexp.MustCompile(`SimRuntime\.([A-Za-z]+)-([0-9-]+)`)
 
 // runtimeNameFromID: "com.apple.CoreSimulator.SimRuntime.iOS-18-4" → "iOS 18.4".
@@ -290,8 +290,8 @@ func dyldName(dir string) string {
 	return runtimeNameFromID(dir) + " (" + build + ")"
 }
 
-// compareVersions сравнивает "27.0" и "18.5" как числа: 27 > 18.
-// Возвращает -1, 0 или 1, как cmp.Compare.
+// compareVersions compares "27.0" and "18.5" as numbers: 27 > 18.
+// Returns -1, 0 or 1, like cmp.Compare.
 func compareVersions(a, b string) int {
 	as, bs := strings.Split(a, "."), strings.Split(b, ".")
 	for i := range max(len(as), len(bs)) {

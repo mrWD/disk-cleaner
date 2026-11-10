@@ -9,44 +9,44 @@ import (
 	"fyne.io/fyne/v2/theme"
 )
 
-// Выбор оформления в настройках — три плитки с картинками, как в
-// Системных настройках macOS (Оформление): «Светлое», «Тёмное», «Авто».
-// На каждой плитке — маленькое окно на фоне рабочего стола в нужных цветах;
-// у «Авто» левая половина светлая, правая — тёмная.
+// The appearance choice in settings is three tiles with pictures, like
+// System Settings in macOS (Appearance): "Light", "Dark", "Auto".
+// Each tile shows a small window on a desktop background in the right colours;
+// for "Auto" the left half is light and the right half is dark.
 
-// Размер картинки на плитке.
+// The size of the picture on a tile.
 const (
 	previewW = 104
 	previewH = 66
 )
 
-// Цвет «рабочего стола» на картинке: светлый и тёмный.
+// The colour of the "desktop" in the picture: light and dark.
 var (
 	wallpaperLight = hex("#A9C1E3")
 	wallpaperDark  = hex("#22304D")
 )
 
-// appearancePicker — три плитки и то, что сейчас выбрано.
+// appearancePicker is the three tiles and the current choice.
 type appearancePicker struct {
 	u        *App
 	selected string
-	box      *fyne.Container // сюда кладутся плитки; перестраивается при выборе
+	box      *fyne.Container // tiles are put here; rebuilt when the choice changes
 }
 
-// newAppearancePicker — плитки с уже выбранным current.
+// newAppearancePicker makes the tiles with current already selected.
 func (u *App) newAppearancePicker(current string) *appearancePicker {
 	p := &appearancePicker{u: u, selected: current, box: container.NewHBox()}
 	p.refill()
 	return p
 }
 
-// pick — выбрать вариант (клик по плитке).
+// pick selects an option (a click on a tile).
 func (p *appearancePicker) pick(mode string) {
 	p.selected = mode
 	p.refill()
 }
 
-// refill перестраивает плитки, чтобы рамка была у выбранной.
+// refill rebuilds the tiles so that the selected one gets the border.
 func (p *appearancePicker) refill() {
 	options := []struct {
 		mode, labelKey string
@@ -60,10 +60,10 @@ func (p *appearancePicker) refill() {
 
 	p.box.Objects = nil
 	for _, o := range options {
-		mode := o.mode // своя копия для замыкания ниже
+		mode := o.mode // our own copy for the closure below
 		selected := mode == p.selected
 
-		// Рамка выбранной плитки — синяя, у остальных — прозрачная.
+		// The border of the selected tile is blue, the others have a transparent one.
 		frame := canvas.NewRectangle(color.Transparent)
 		frame.CornerRadius = 10
 		frame.StrokeWidth = 2.5
@@ -83,19 +83,19 @@ func (p *appearancePicker) refill() {
 	p.box.Refresh()
 }
 
-// preview рисует маленькое окно на фоне рабочего стола. left и right —
-// цвета левой и правой половины (у «Авто» они разные).
+// preview draws a small window on a desktop background. left and right are
+// the colours of the left and right halves (they differ for "Auto").
 //
-// container.NewWithoutLayout — контейнер без раскладки: каждый
-// прямоугольник ставим руками через Move (где) и Resize (какого размера).
+// container.NewWithoutLayout is a container with no layout: we place every
+// rectangle by hand with Move (where) and Resize (what size).
 func preview(left, right palette, wallL, wallR color.Color) fyne.CanvasObject {
 	const (
 		w, h  = float32(previewW), float32(previewH)
 		half  = w / 2
-		winX  = 14 // окно: отступ слева
-		winY  = 12 // и сверху; снизу окно уходит за край, как в macOS
+		winX  = 14 // window: left margin
+		winY  = 12 // and top margin; at the bottom the window runs off the edge, as in macOS
 		winR  = w - 10
-		sideW = 22 // боковая панель окна
+		sideW = 22 // the window's sidebar
 	)
 
 	var objs []fyne.CanvasObject
@@ -107,23 +107,23 @@ func preview(left, right palette, wallL, wallR color.Color) fyne.CanvasObject {
 		return r
 	}
 
-	// Рабочий стол: две половины, скруглены только внешние углы.
+	// Desktop: two halves, only the outer corners are rounded.
 	l := place(wallL, 0, 0, half, h)
 	l.TopLeftCornerRadius, l.BottomLeftCornerRadius = 7, 7
 	r := place(wallR, half, 0, half, h)
 	r.TopRightCornerRadius, r.BottomRightCornerRadius = 7, 7
 
-	// Окно: левая часть в цветах left, правая — в цветах right.
+	// Window: the left part in the left colours, the right part in the right colours.
 	wl := place(left.background, winX, winY, half-winX, h-winY)
 	wl.TopLeftCornerRadius = 4
 	wr := place(right.background, half, winY, winR-half, h-winY)
 	wr.TopRightCornerRadius = 4
 
-	// Боковая панель окна (в левой половине) и синяя «выбранная строка».
+	// The window's sidebar (in the left half) and the blue "selected row".
 	place(left.sidebar, winX, winY+3, sideW, h-winY-3)
 	place(left.accent, winX+3, winY+8, sideW-6, 4)
 
-	// Две «строки текста» в окне — по половинке в каждой части.
+	// Two "text lines" in the window, one half-line in each part.
 	textX := float32(winX + sideW + 6)
 	place(left.secondary, textX, winY+9, half-textX, 3)
 	place(right.secondary, half, winY+9, winR-half-10, 3)

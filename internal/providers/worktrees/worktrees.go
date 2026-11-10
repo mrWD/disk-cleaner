@@ -1,12 +1,12 @@
-// Package worktrees — провайдер «артефактов» в git worktree: node_modules,
-// Pods, build и других папок, которые создаются установкой и сборкой.
+// Package worktrees is the provider for "artifacts" in git worktrees: node_modules,
+// Pods, build and other folders that installing and building create.
 //
-// Worktree — дополнительная рабочая копия репозитория (git worktree add).
-// Их много создают сессии Claude Code: courses/.claude/worktrees/*.
-// Код в них лежит в git, а вот зависимости и сборки занимают гигабайты.
+// A worktree is an extra working copy of a repository (git worktree add).
+// Claude Code sessions create lots of them: courses/.claude/worktrees/*.
+// The code is in git, but dependencies and builds take gigabytes.
 //
-// Поиск репозиториев и проверка «git игнорирует» — в пакете gitscan,
-// общем с провайдером projects (основные репозитории).
+// Finding repositories and checking "does git ignore this" live in the gitscan
+// package, shared with the projects provider (the main repositories).
 package worktrees
 
 import (
@@ -29,21 +29,21 @@ var translations embed.FS
 
 const (
 	catArtifacts = "worktrees.artifacts"
-	catBuilds    = "worktrees.builds" // готовые сборки, которые git не отслеживает
+	catBuilds    = "worktrees.builds" // finished builds that git does not track
 
-	// Причина: из worktree запущен процесс (текст в translations).
+	// Reason: a process is running from the worktree (text is in translations).
 	reasonProcessRunning = "worktrees.process_running"
 )
 
-// Provider ищет worktree в заданных папках.
+// Provider looks for worktrees in the given folders.
 type Provider struct {
-	roots     func() []string // где искать; функция, потому что пользователь меняет это в настройках
+	roots     func() []string // where to look; a function because the user changes this in settings
 	run       shell.Runner
 	processes func(ctx context.Context) []string
-	minSize   core.Bytes // меньше — не показываем (в тестах — 1 байт)
+	minSize   core.Bytes // smaller than this is not shown (in tests, 1 byte)
 }
 
-// New — провайдер; roots вызывается при каждом сканировании.
+// New is the provider; roots is called on every scan.
 func New(roots func() []string) *Provider {
 	return &Provider{roots: roots, run: shell.Run, processes: kit.Processes, minSize: gitscan.MinSize}
 }
@@ -55,7 +55,7 @@ func (p *Provider) Translations() embed.FS { return translations }
 func (p *Provider) Categories() []core.Category {
 	return []core.Category{
 		{ID: catArtifacts, Risk: core.RiskSafe},
-		// Архив может понадобиться, чтобы расшифровать крэши версии из App Store.
+		// An archive may be needed to decode crashes of the version in the App Store.
 		{ID: catBuilds, Risk: core.RiskCaution},
 	}
 }
@@ -72,7 +72,7 @@ func (p *Provider) Scan(ctx context.Context) ([]core.Item, error) {
 	for _, root := range p.roots() {
 		for _, repo := range gitscan.FindRepos(root) {
 			if repo.Kind != gitscan.Worktree {
-				continue // основные репозитории — у провайдера projects
+				continue // main repositories belong to the projects provider
 			}
 			wt := repo.Path
 
@@ -80,11 +80,11 @@ func (p *Provider) Scan(ctx context.Context) ([]core.Item, error) {
 			if b := gitscan.Branch(ctx, p.run, wt); b != "" {
 				branch = " · " + b
 			}
-			// Процесс, запущенный из этого worktree (Metro, Expo, Vite, Gradle…),
-			// держит его node_modules — удалять под ним нельзя.
+			// A process started from this worktree (Metro, Expo, Vite, Gradle…)
+			// holds its node_modules open, so we must not delete under it.
 			process := kit.FindProcess(processes, wt+"/")
 
-			// add — добавить найденную папку или файл в нужную категорию.
+			// add puts a found folder or file into the right category.
 			add := func(cat, rel string) {
 				path := filepath.Join(wt, rel)
 				it := core.Item{
@@ -101,24 +101,24 @@ func (p *Provider) Scan(ctx context.Context) ([]core.Item, error) {
 				paths = append(paths, path)
 			}
 
-			// Папки зависимостей и сборки — только те, что git игнорирует.
+			// Dependency and build folders: only the ones git ignores.
 			for _, rel := range gitscan.Ignored(ctx, p.run, wt, gitscan.FindArtifacts(wt)) {
 				add(catArtifacts, rel)
 			}
-			// Готовые сборки рядом с кодом — только те, что git не отслеживает.
+			// Finished builds next to the code: only the ones git does not track.
 			for _, rel := range gitscan.Untracked(ctx, p.run, wt, gitscan.FindBuilds(wt)) {
 				add(catBuilds, rel)
 			}
 		}
 	}
 
-	// Размеры всех найденных папок — параллельно.
+	// Sizes of all found folders, in parallel.
 	sizes := diskutil.SizeAll(ctx, paths, kit.Workers())
 	for i := range items {
 		items[i].Size = sizes[i]
 	}
 
-	// Мелочь не показываем; самое большое — сверху.
+	// Hide the small stuff; the biggest on top.
 	items = slices.DeleteFunc(items, func(it core.Item) bool { return it.Size < p.minSize })
 	slices.SortFunc(items, func(a, b core.Item) int { return cmp.Compare(b.Size, a.Size) })
 

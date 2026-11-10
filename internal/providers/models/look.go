@@ -1,13 +1,13 @@
 package models
 
-import _ "embed" // _ — пакет нужен только ради //go:embed ниже
+import _ "embed" // _ means the package is only needed for the //go:embed below
 
-// Значок для списка слева: белый SVG, рисуется поверх цветной плашки.
-// //go:embed кладёт содержимое файла в переменную при сборке.
+// The icon for the list on the left: a white SVG drawn on top of a colored tile.
+// //go:embed puts the contents of the file into the variable at build time.
 //
 //go:embed icon.svg
 var icon []byte
 
-// Look — значок и цвет плашки (розовый из системной палитры macOS).
-// Реализует необязательный интерфейс core.Look.
+// Look is the icon and the tile color (pink from the macOS system palette).
+// Implements the optional core.Look interface.
 func (p *Provider) Look() ([]byte, string) { return icon, "#FF2D55" }

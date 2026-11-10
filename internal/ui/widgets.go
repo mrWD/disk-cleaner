@@ -13,26 +13,26 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-// Кирпичики оформления в духе macOS: плашки, «таблетки», значки разделов,
-// тонкие разделители. Из них собираются все экраны.
+// Styling building blocks in the spirit of macOS: cards, "pills", section icons,
+// thin dividers. All the screens are assembled from them.
 //
-// canvas.* — это «рисование»: прямоугольник, текст, картинка. Они ничего
-// не умеют, кроме как выглядеть. widget.* — интерактивные элементы.
+// canvas.* is "drawing": a rectangle, text, an image. They can't do
+// anything except look a certain way. widget.* are interactive elements.
 
-// card — «сгруппированная» плашка как в Системных настройках:
-// белый (в тёмном виде — серый) скруглённый прямоугольник с тонкой рамкой.
+// card is a "grouped" card like in System Settings:
+// a white (grey in the dark look) rounded rectangle with a thin border.
 func card(content fyne.CanvasObject) fyne.CanvasObject {
 	bg := canvas.NewRectangle(theme.Color(colorCard))
 	bg.CornerRadius = 10
 	bg.StrokeColor = theme.Color(colorCardStroke)
 	bg.StrokeWidth = 1
 
-	// Stack кладёт объекты друг на друга: фон снизу, содержимое сверху.
+	// Stack puts objects on top of each other: the background below, the content above.
 	return container.NewStack(bg, pad(10, 10, 14, 14, content))
 }
 
-// text — надпись нужного размера, цвета и жирности. В отличие от Label
-// она не переносится по словам — для коротких заголовков и цифр.
+// text is a label of the needed size, colour and weight. Unlike Label,
+// it does not wrap by words, so it is for short titles and numbers.
 func text(s string, size fyne.ThemeSizeName, colorName fyne.ThemeColorName, bold bool) *canvas.Text {
 	t := canvas.NewText(s, theme.Color(colorName))
 	t.TextSize = theme.Size(size)
@@ -40,8 +40,8 @@ func text(s string, size fyne.ThemeSizeName, colorName fyne.ThemeColorName, bold
 	return t
 }
 
-// secondary — серый текст с переносом по словам (или с обрезкой «…»,
-// если wrap = false). RichText умеет и свой цвет, и перенос.
+// secondary is grey text that wraps by words (or is cut off with "…"
+// if wrap = false). RichText supports both its own colour and wrapping.
 func secondary(s string, wrap bool) *widget.RichText {
 	rt := widget.NewRichText(&widget.TextSegment{
 		Text: s,
@@ -59,7 +59,7 @@ func secondary(s string, wrap bool) *widget.RichText {
 	return rt
 }
 
-// colored — текст заданного цвета с переносом (для предупреждений).
+// colored is text of a given colour with wrapping (for warnings).
 func colored(s string, colorName fyne.ThemeColorName) *widget.RichText {
 	rt := widget.NewRichText(&widget.TextSegment{
 		Text:  s,
@@ -69,24 +69,24 @@ func colored(s string, colorName fyne.ThemeColorName) *widget.RichText {
 	return rt
 }
 
-// pill — «таблетка» как у статусов в macOS: цветной текст на бледном
-// фоне того же цвета, со скруглёнными краями.
+// pill is a "pill" like the statuses in macOS: coloured text on a pale
+// background of the same colour, with rounded edges.
 func pill(s string, colorName fyne.ThemeColorName) fyne.CanvasObject {
 	c := theme.Color(colorName)
 
 	label := text(s, theme.SizeNameCaptionText, colorName, true)
-	bg := canvas.NewRectangle(withAlpha(c, 0x2E)) // ~18% непрозрачности
+	bg := canvas.NewRectangle(withAlpha(c, 0x2E)) // ~18% opacity
 	bg.CornerRadius = 8
 
-	return container.NewCenter( // Center — не растягивать таблетку по высоте строки
+	return container.NewCenter( // Center: don't stretch the pill to the height of the row
 		container.NewStack(bg, pad(2, 2, 8, 8, label)),
 	)
 }
 
-// padLayout — отступы вокруг объекта. Как layout.NewCustomPaddedLayout,
-// но никогда не даёт объекту отрицательный размер: пока окно раскладывается,
-// место бывает меньше отступов, а рисовальщик Fyne на отрицательных размерах
-// падает. Отрицательный отступ сверху допустим — объект сдвигается вверх.
+// padLayout adds padding around an object. Like layout.NewCustomPaddedLayout,
+// but it never gives the object a negative size: while the window is being laid out,
+// the space can be smaller than the padding, and Fyne's renderer crashes on negative sizes.
+// A negative padding on top is allowed: the object shifts up.
 type padLayout struct{ top, bottom, left, right float32 }
 
 func (p padLayout) MinSize(objects []fyne.CanvasObject) fyne.Size {
@@ -108,10 +108,10 @@ func (p padLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 	}
 }
 
-// edgeLayout — как Border из Fyne (верх, низ, лево, право и центр), но
-// без зазоров между частями. Стандартный Border вставляет между ними
-// отступ темы (6 px), и там, где рядом разные цвета (серая боковая панель,
-// серая нижняя полоса), сквозь щель проглядывает фон окна.
+// edgeLayout is like Fyne's Border (top, bottom, left, right and centre), but
+// without gaps between the parts. The standard Border puts the theme's padding
+// (6 px) between them, and where different colours sit side by side (the grey sidebar,
+// the grey bottom strip), the window background shows through the gap.
 type edgeLayout struct {
 	top, bottom, left, right fyne.CanvasObject
 }
@@ -169,8 +169,8 @@ func (l edgeLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 	}
 }
 
-// edges — контейнер edgeLayout: части окна вплотную друг к другу.
-// Порядок аргументов — как у container.NewBorder.
+// edges is an edgeLayout container: the window parts sit flush against each other.
+// The order of arguments is the same as in container.NewBorder.
 func edges(top, bottom, left, right fyne.CanvasObject, center ...fyne.CanvasObject) *fyne.Container {
 	objects := append([]fyne.CanvasObject{}, center...)
 	for _, o := range []fyne.CanvasObject{top, bottom, left, right} {
@@ -181,83 +181,83 @@ func edges(top, bottom, left, right fyne.CanvasObject, center ...fyne.CanvasObje
 	return container.New(edgeLayout{top: top, bottom: bottom, left: left, right: right}, objects...)
 }
 
-// pad — объект с отступами: сверху, снизу, слева, справа.
+// pad is an object with padding: top, bottom, left, right.
 func pad(top, bottom, left, right float32, objects ...fyne.CanvasObject) *fyne.Container {
 	return container.New(padLayout{top, bottom, left, right}, objects...)
 }
 
-// link — кнопка-ссылка синим текстом, как «Select All» в приложениях Apple.
-// Hyperlink без адреса просто вызывает onTap.
+// link is a button-link in blue text, like "Select All" in Apple apps.
+// A Hyperlink without an address just calls onTap.
 func link(s string, onTap func()) *widget.Hyperlink {
 	h := widget.NewHyperlink(s, nil)
 	h.OnTapped = onTap
 	return h
 }
 
-// withAlpha — тот же цвет с другой прозрачностью (0 — прозрачный, 255 — сплошной).
+// withAlpha is the same colour with a different transparency (0 is transparent, 255 is solid).
 func withAlpha(c color.Color, a uint8) color.Color {
 	n := color.NRGBAModel.Convert(c).(color.NRGBA)
 	n.A = a
 	return n
 }
 
-// roundedRect — скруглённый прямоугольник одного цвета.
+// roundedRect is a rounded rectangle of one colour.
 func roundedRect(c color.Color, radius float32) *canvas.Rectangle {
 	r := canvas.NewRectangle(c)
 	r.CornerRadius = radius
 	return r
 }
 
-// hairline — тонкая линия-разделитель на всю ширину.
+// hairline is a thin dividing line across the full width.
 func hairline() fyne.CanvasObject {
 	line := canvas.NewRectangle(theme.Color(theme.ColorNameSeparator))
 	line.SetMinSize(fyne.NewSize(1, 1))
 	return line
 }
 
-// gap — пустое место заданного размера (отступ).
+// gap is an empty space of a given size (a spacer).
 func gap(w, h float32) fyne.CanvasObject {
 	r := canvas.NewRectangle(color.Transparent)
 	r.SetMinSize(fyne.NewSize(w, h))
 	return r
 }
 
-// badge — значок раздела: белый рисунок на цветной скруглённой плашке,
-// как в боковой панели Системных настроек.
+// badge is a section icon: a white drawing on a coloured rounded card,
+// like in the System Settings sidebar.
 func badge(svg []byte, tint color.Color, size float32) fyne.CanvasObject {
 	bg := canvas.NewRectangle(tint)
 	bg.CornerRadius = size * 0.24
 
 	var icon fyne.CanvasObject = gap(0, 0)
 	if len(svg) > 0 {
-		// Имя ресурса — по содержимому: Fyne кэширует картинки по имени,
-		// и с одинаковым именем у всех разделов был бы один и тот же значок.
+		// The resource name comes from the content: Fyne caches images by name,
+		// and with the same name for every section they would all get the same icon.
 		name := fmt.Sprintf("icon-%08x.svg", crc32.ChecksumIEEE(svg))
 		img := canvas.NewImageFromResource(fyne.NewStaticResource(name, svg))
 		img.FillMode = canvas.ImageFillContain
 		icon = img
 	}
 
-	inset := size * 0.2 // отступ рисунка от краёв плашки
-	// GridWrap делает каждый объект ровно заданного размера.
+	inset := size * 0.2 // the drawing's margin from the edges of the card
+	// GridWrap makes every object exactly the given size.
 	return container.NewGridWrap(fyne.NewSize(size, size),
 		container.NewStack(bg, pad(inset, inset, inset, inset, icon)))
 }
 
-// symbol — маленький значок нужного цвета (стандартный значок Fyne,
-// перекрашенный в цвет темы).
+// symbol is a small icon of the needed colour (a standard Fyne icon,
+// recoloured to the theme colour).
 func symbol(res fyne.Resource, colorName fyne.ThemeColorName, size float32) fyne.CanvasObject {
 	img := canvas.NewImageFromResource(theme.NewColoredResource(res, colorName))
 	img.FillMode = canvas.ImageFillContain
 	return container.NewGridWrap(fyne.NewSize(size, size), img)
 }
 
-// tappable — область, по которой можно кликнуть, с подсветкой при наведении.
-// Нужна для строк боковой панели: обычная кнопка выглядит не так.
+// tappable is an area you can click, with a highlight on hover.
+// It is needed for the sidebar rows: a plain button looks different.
 //
-// Свой виджет в Fyne: встраиваем widget.BaseWidget, вызываем ExtendBaseWidget
-// и даём CreateRenderer — «как рисовать». Методы Tapped / MouseIn / MouseOut
-// делают виджет кликабельным и чувствительным к наведению.
+// A custom widget in Fyne: we embed widget.BaseWidget, call ExtendBaseWidget
+// and provide CreateRenderer, which says "how to draw". The methods Tapped / MouseIn / MouseOut
+// make the widget clickable and sensitive to hovering.
 type tappable struct {
 	widget.BaseWidget
 	content fyne.CanvasObject
@@ -278,14 +278,14 @@ func (t *tappable) CreateRenderer() fyne.WidgetRenderer {
 	return widget.NewSimpleRenderer(container.NewStack(t.hover, t.content))
 }
 
-// Tapped — клик.
+// Tapped is a click.
 func (t *tappable) Tapped(*fyne.PointEvent) {
 	if t.onTap != nil {
 		t.onTap()
 	}
 }
 
-// MouseIn / MouseMoved / MouseOut — наведение мыши (интерфейс desktop.Hoverable).
+// MouseIn / MouseMoved / MouseOut handle mouse hovering (the desktop.Hoverable interface).
 func (t *tappable) MouseIn(*desktop.MouseEvent) {
 	t.hover.FillColor = theme.Color(theme.ColorNameHover)
 	t.hover.Refresh()
@@ -298,14 +298,14 @@ func (t *tappable) MouseOut() {
 	t.hover.Refresh()
 }
 
-// segment — одна часть полосы заполнения диска.
+// segment is one part of the disk fill bar.
 type segment struct {
 	size  float64
 	color color.Color
 }
 
-// barLayout раскладывает части полосы по ширине пропорционально размерам.
-// Свой Layout в Fyne — это два метода: MinSize и Layout.
+// barLayout lays out the parts of the bar across the width in proportion to their sizes.
+// A custom Layout in Fyne is two methods: MinSize and Layout.
 type barLayout struct {
 	weights []float64
 	gap     float32
@@ -322,8 +322,8 @@ func (l barLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 		return
 	}
 
-	// Пока окно не разложено, ширина бывает нулевой; отрицательной
-	// ширины у прямоугольника быть не должно — рисовальщик Fyne на ней падает.
+	// Until the window is laid out, the width can be zero; a rectangle must not have
+	// a negative width, because Fyne's renderer crashes on it.
 	width := max(size.Width-l.gap*float32(len(objects)-1), 0)
 	x := float32(0)
 	for i, o := range objects {
@@ -334,8 +334,8 @@ func (l barLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 	}
 }
 
-// storageBar — полоса как в «Хранилище» macOS: занятое, найденное
-// к очистке (цветом разделов) и свободное. Скруглены только внешние края.
+// storageBar is a bar like "Storage" in macOS: used space, what was found
+// for cleaning (in the sections' colours) and free space. Only the outer edges are rounded.
 func storageBar(parts []segment) fyne.CanvasObject {
 	var objects []fyne.CanvasObject
 	var weights []float64
@@ -344,7 +344,7 @@ func storageBar(parts []segment) fyne.CanvasObject {
 		if p.size <= 0 {
 			continue
 		}
-		// Очень маленькие части всё равно видны хотя бы полоской.
+		// Very small parts are still visible as at least a thin line.
 		weights = append(weights, max(p.size, 0))
 		objects = append(objects, canvas.NewRectangle(p.color))
 	}

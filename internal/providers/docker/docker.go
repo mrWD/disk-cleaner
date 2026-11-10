@@ -1,8 +1,8 @@
-// Package docker — провайдер Docker: контейнеры, образы, тома и кэш сборки.
+// Package docker is the provider for Docker: containers, images, volumes and the build cache.
 //
-// Всё узнаём одной командой: docker system df -v --format '{{json .}}'.
-// Она отдаёт JSON сразу по всем четырём видам объектов, включая то,
-// сколько контейнеров использует каждый образ и каждый том.
+// We learn everything with one command: docker system df -v --format '{{json .}}'.
+// It returns JSON for all four kinds of objects at once, including how
+// many containers use each image and each volume.
 package docker
 
 import (
@@ -29,22 +29,22 @@ const (
 	catVolumes    = "docker.volumes"
 	catBuildCache = "docker.build_cache"
 
-	// Ключи причин, почему Docker сейчас недоступен (тексты в translations).
+	// Keys of the reasons Docker is unavailable right now (texts are in translations).
 	reasonNotInstalled = "docker.not_installed"
 	reasonNotRunning   = "docker.not_running"
 
-	// Кем занят объект.
+	// Who is using the object.
 	reasonImageUsed      = "docker.image_used"
 	reasonVolumeAttached = "docker.volume_attached"
 )
 
-// Provider спрашивает Docker через его командную строку.
+// Provider asks Docker through its command line.
 type Provider struct {
-	run  shell.Runner                     // запуск команд; в тестах — фейк
-	look func(name string) (string, bool) // поиск программы; в тестах — фейк
+	run  shell.Runner                     // runs commands; a fake in tests
+	look func(name string) (string, bool) // looks up a program; a fake in tests
 }
 
-// New — провайдер, который запускает настоящий docker.
+// New is the provider that runs the real docker.
 func New() *Provider {
 	return &Provider{run: shell.Run, look: shell.LookPath}
 }
@@ -55,20 +55,20 @@ func (p *Provider) Translations() embed.FS { return translations }
 
 func (p *Provider) Categories() []core.Category {
 	return []core.Category{
-		// В остановленном контейнере могут остаться данные, записанные внутрь него.
+		// A stopped container may still hold data that was written inside it.
 		{ID: catContainers, Risk: core.RiskCaution},
 		{ID: catImages, Risk: core.RiskSafe},
-		// В томах часто живут базы данных.
+		// Volumes often hold databases.
 		{ID: catVolumes, Risk: core.RiskCaution},
 		{ID: catBuildCache, Risk: core.RiskSafe},
 	}
 }
 
-// text — строка в JSON Docker. Некоторые поля Docker отдаёт то строкой
-// ("0"), то числом (0); этот тип принимает оба варианта.
+// text is a string in Docker's JSON. Docker returns some fields sometimes as a string
+// ("0"), sometimes as a number (0); this type accepts both.
 type text string
 
-// UnmarshalJSON вызывается пакетом encoding/json для полей типа text.
+// UnmarshalJSON is called by the encoding/json package for fields of type text.
 func (t *text) UnmarshalJSON(b []byte) error {
 	if len(b) > 0 && b[0] == '"' {
 		var s string
@@ -87,8 +87,8 @@ func (t *text) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// dfOutput — нужная нам часть ответа docker system df -v.
-// Имена полей совпадают с ключами JSON, поэтому теги `json:"..."` не нужны.
+// dfOutput is the part of the docker system df -v answer that we need.
+// Field names match the JSON keys, so the `json:"..."` tags are not needed.
 type dfOutput struct {
 	Containers []struct {
 		ID, Names, Image, State, Status, Size text
@@ -110,7 +110,7 @@ func (p *Provider) Scan(ctx context.Context) ([]core.Item, error) {
 		return nil, core.Unavailable(reasonNotInstalled)
 	}
 
-	// Если Docker «завис», не ждём вечно.
+	// If Docker "hangs", we do not wait forever.
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
@@ -130,7 +130,7 @@ func (p *Provider) Scan(ctx context.Context) ([]core.Item, error) {
 	return toItems(df), nil
 }
 
-// isNotRunning — по тексту ошибки понимаем, что Docker просто выключен.
+// isNotRunning tells from the error text that Docker is simply turned off.
 func isNotRunning(err error) bool {
 	if errors.Is(err, exec.ErrNotFound) {
 		return false
@@ -141,8 +141,8 @@ func isNotRunning(err error) bool {
 		strings.Contains(msg, "docker.sock")
 }
 
-// toItems превращает ответ Docker в объекты. Отдельная функция без
-// запуска команд — её удобно тестировать на записанном JSON.
+// toItems turns Docker's answer into items. A separate function without
+// running commands, so it is easy to test on recorded JSON.
 func toItems(df dfOutput) []core.Item {
 	var items []core.Item
 
@@ -152,8 +152,8 @@ func toItems(df dfOutput) []core.Item {
 			CategoryID: catContainers,
 			Name:       string(c.Names) + " · " + string(c.Image),
 			Detail:     string(c.Status),
-			// "2.5kB (virtual 120MB)": освободится только первая часть,
-			// «виртуальная» — это образ, он удаляется отдельно.
+			// "2.5kB (virtual 120MB)": only the first part will be freed,
+			// the "virtual" one is the image, which is deleted separately.
 			Size: parseSize(strings.Fields(string(c.Size))),
 		}
 		switch c.State {
@@ -169,8 +169,8 @@ func toItems(df dfOutput) []core.Item {
 			name = "untagged · " + shortID(string(img.ID))
 		}
 
-		// UniqueSize — то, что освободится: слои, общие с другими
-		// образами, останутся на диске.
+		// UniqueSize is what will be freed: layers shared with other
+		// images stay on disk.
 		size := parseSize([]string{string(img.UniqueSize)})
 		if size == 0 {
 			size = parseSize([]string{string(img.Size)})
@@ -184,7 +184,7 @@ func toItems(df dfOutput) []core.Item {
 			Size:       size,
 		}
 		if n, _ := strconv.Atoi(string(img.Containers)); n > 0 {
-			it.Status = core.StatusInUse // образ нужен контейнеру
+			it.Status = core.StatusInUse // the image is needed by a container
 			it.Busy = &core.Reason{Key: reasonImageUsed, Args: map[string]any{"Count": n}}
 		}
 		items = append(items, it)
@@ -203,14 +203,14 @@ func toItems(df dfOutput) []core.Item {
 			Size:       parseSize([]string{string(v.Size)}),
 		}
 		if n, _ := strconv.Atoi(string(v.Links)); n > 0 {
-			it.Status = core.StatusInUse // том подключён к контейнеру
+			it.Status = core.StatusInUse // the volume is attached to a container
 			it.Busy = &core.Reason{Key: reasonVolumeAttached, Args: map[string]any{"Count": n}}
 		}
 		items = append(items, it)
 	}
 
-	// Кэш сборки — сотни записей. Показываем одним объектом всё, что
-	// не используется прямо сейчас: именно это удалит docker builder prune.
+	// The build cache is hundreds of entries. We show everything that
+	// is not in use right now as one item: that is exactly what docker builder prune deletes.
 	var cache core.Bytes
 	for _, b := range df.BuildCache {
 		if b.InUse != "true" {
@@ -229,15 +229,15 @@ func toItems(df dfOutput) []core.Item {
 	return items
 }
 
-// Plan — команды docker для каждого объекта.
+// Plan is the docker commands for each item.
 func (p *Provider) Plan(items []core.Item) ([]core.Action, error) {
 	docker, ok := p.look("docker")
 	if !ok {
 		return nil, core.Unavailable(reasonNotInstalled)
 	}
 
-	// Сначала контейнеры, потом образы и тома: так удаление контейнера
-	// не помешает удалить его образ в том же плане.
+	// Containers first, then images and volumes: this way deleting a container
+	// does not get in the way of deleting its image in the same plan.
 	order := []string{catContainers, catImages, catVolumes, catBuildCache}
 
 	var actions []core.Action
@@ -264,7 +264,7 @@ func (p *Provider) Plan(items []core.Item) ([]core.Action, error) {
 	return actions, nil
 }
 
-// shortID — первые 12 символов ID, как их показывает сам Docker.
+// shortID is the first 12 characters of an ID, as Docker itself shows them.
 func shortID(id string) string {
 	id = strings.TrimPrefix(id, "sha256:")
 	if len(id) > 12 {
@@ -273,17 +273,17 @@ func shortID(id string) string {
 	return id
 }
 
-// sizeRe разбирает размер в стиле Docker: "66.72MB", "0B", "7.19kB".
+// sizeRe parses a size in Docker's style: "66.72MB", "0B", "7.19kB".
 var sizeRe = regexp.MustCompile(`^([0-9.]+)\s*([kKMGTP]?i?B)$`)
 
-// parseSize берёт первое слово из fields и превращает его в байты.
-// Docker считает в десятичных единицах, как и мы. Непонятное — 0.
+// parseSize takes the first word from fields and turns it into bytes.
+// Docker counts in decimal units, like we do. Anything unclear is 0.
 func parseSize(fields []string) core.Bytes {
 	if len(fields) == 0 {
 		return 0
 	}
 
-	m := sizeRe.FindStringSubmatch(fields[0]) // [всё совпадение, число, единица]
+	m := sizeRe.FindStringSubmatch(fields[0]) // [whole match, number, unit]
 	if m == nil {
 		return 0
 	}

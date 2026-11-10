@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// mkdir создаёт папку (и все папки до неё).
+// mkdir creates a folder (and all folders leading to it).
 func mkdir(t *testing.T, parts ...string) string {
 	t.Helper()
 	dir := filepath.Join(parts...)
@@ -17,7 +17,7 @@ func mkdir(t *testing.T, parts ...string) string {
 	return dir
 }
 
-// writeGitFile делает dir worktree: .git — файл со ссылкой на .git/worktrees.
+// writeGitFile makes dir a worktree: .git is a file pointing to .git/worktrees.
 func writeGitFile(t *testing.T, dir, gitdir string) {
 	t.Helper()
 	if err := os.WriteFile(filepath.Join(dir, ".git"), []byte("gitdir: "+gitdir+"\n"), 0o644); err != nil {
@@ -26,7 +26,7 @@ func writeGitFile(t *testing.T, dir, gitdir string) {
 }
 
 func TestFindRepos(t *testing.T) {
-	// Given: основной репозиторий, worktree внутри него и подмодуль
+	// Given: a main repository, a worktree inside it and a submodule
 	root := t.TempDir()
 	main := mkdir(t, root, "courses")
 	mkdir(t, main, ".git")
@@ -38,7 +38,7 @@ func TestFindRepos(t *testing.T) {
 	// When
 	repos := FindRepos(root)
 
-	// Then: основной и worktree найдены, подмодуль — нет
+	// Then: the main repository and the worktree are found, the submodule is not
 	var got []string
 	for _, r := range repos {
 		kind := "main"
@@ -55,7 +55,7 @@ func TestFindRepos(t *testing.T) {
 }
 
 func TestFindArtifactsStopsAtNestedRepos(t *testing.T) {
-	// Given: репозиторий со своими node_modules и worktree внутри с чужими
+	// Given: a repository with its own node_modules and a worktree inside with someone else's
 	root := t.TempDir()
 	mkdir(t, root, ".git")
 	mkdir(t, root, "node_modules", "react")
@@ -67,7 +67,7 @@ func TestFindArtifactsStopsAtNestedRepos(t *testing.T) {
 	// When
 	found := FindArtifacts(root)
 
-	// Then: только свои
+	// Then: only its own
 	slices.Sort(found)
 	if !slices.Equal(found, []string{"ios/Pods", "node_modules"}) {
 		t.Errorf("FindArtifacts = %v", found)
@@ -75,7 +75,7 @@ func TestFindArtifactsStopsAtNestedRepos(t *testing.T) {
 }
 
 func TestFindBuilds(t *testing.T) {
-	// Given: архив и установщик в корне, .apk внутри build/ и .app с вложенными .app
+	// Given: an archive and an installer in the root, an .apk inside build/ and an .app with nested .app
 	root := t.TempDir()
 	mkdir(t, root, ".git")
 	mkdir(t, root, "Lingary-191.xcarchive", "Products")
@@ -89,8 +89,8 @@ func TestFindBuilds(t *testing.T) {
 	found := FindBuilds(root)
 	slices.Sort(found)
 
-	// Then: build/ не трогаем (папка и так показывается целиком),
-	// внутрь .app не заходим.
+	// Then: build/ is left alone (the folder is shown as a whole anyway),
+	// we don't go inside the .app.
 	want := []string{"Lingary-1.0.0.dmg", "Lingary-191.xcarchive", "desktop/mac/Lingary.app"}
 	if !slices.Equal(found, want) {
 		t.Errorf("FindBuilds = %v, want %v", found, want)

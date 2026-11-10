@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 )
 
-// VolumeName — имя системного диска, как его показывает Finder
-// ("Macintosh HD"). В /Volumes у системного диска есть ссылка на "/" —
-// её имя и есть название диска. Если найти не удалось — fallback.
+// VolumeName is the name of the system disk as Finder shows it
+// ("Macintosh HD"). In /Volumes the system disk has a link to "/",
+// and the link's name is the disk's name. If it can't be found, fallback is returned.
 func VolumeName(fallback string) string {
 	entries, err := os.ReadDir("/Volumes")
 	if err != nil {

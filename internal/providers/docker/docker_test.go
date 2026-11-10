@@ -10,8 +10,8 @@ import (
 	"disk-cleaner/internal/providers/providertest"
 )
 
-// sampleDF — ответ docker system df -v в том виде, в каком его отдаёт
-// Docker Desktop: числа в полях — строками, размеры — с единицами.
+// sampleDF is the answer of docker system df -v in the form in which Docker Desktop
+// returns it: numbers in fields are strings, sizes come with units.
 const sampleDF = `{
   "Containers": [
     {"ID": "a1b2c3d4e5f6", "Names": "redis", "Image": "redis:8", "State": "running", "Status": "Up 2 hours", "Size": "98MB (virtual 140MB)"},
@@ -32,7 +32,7 @@ const sampleDF = `{
   ]
 }`
 
-// fakeDocker — провайдер, который вместо docker возвращает заданный ответ.
+// fakeDocker is a provider that returns a given answer instead of running docker.
 func fakeDocker(out string, runErr error) *Provider {
 	return &Provider{
 		look: func(string) (string, bool) { return "/usr/local/bin/docker", true },
@@ -42,7 +42,7 @@ func fakeDocker(out string, runErr error) *Provider {
 	}
 }
 
-// byName — найти объект по имени (или пустой, если нет).
+// byName finds an item by name (or returns an empty one if there is none).
 func byName(items []core.Item, name string) core.Item {
 	i := slices.IndexFunc(items, func(it core.Item) bool { return it.Name == name })
 	if i < 0 {

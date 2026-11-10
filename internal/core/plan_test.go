@@ -7,16 +7,16 @@ import (
 	"testing"
 )
 
-// fakeProvider — провайдер для тестов. Он ничего не ищет на диске:
-// объекты задаются прямо в тесте, а Plan удаляет каждый объект по его ID.
+// fakeProvider is a provider for tests. It looks for nothing on disk:
+// the items are set right in the test, and Plan deletes each item by its ID.
 type fakeProvider struct {
 	id      string
-	planErr error // если не nil — Plan вернёт эту ошибку
-	noPlan  bool  // если true — Plan вернёт пустой список (ошибка провайдера)
+	planErr error // if not nil, Plan returns this error
+	noPlan  bool  // if true, Plan returns an empty list (a provider bug)
 }
 
-// Пять методов ниже делают fakeProvider провайдером: интерфейс Provider
-// выполняется автоматически, слово implements в Go не нужно.
+// The five methods below make fakeProvider a provider: the Provider interface
+// is satisfied automatically, Go has no "implements" keyword.
 func (f fakeProvider) ID() string { return f.id }
 
 func (f fakeProvider) Categories() []Category {
@@ -42,14 +42,14 @@ func (f fakeProvider) Plan(items []Item) ([]Action, error) {
 
 func (f fakeProvider) Translations() embed.FS { return embed.FS{} }
 
-// fakeExecutor ничего не удаляет: записывает, что его попросили сделать,
-// и «падает» на путях из failOn.
+// fakeExecutor deletes nothing: it records what it was asked to do
+// and "fails" on the paths listed in failOn.
 type fakeExecutor struct {
 	ran    []string
 	failOn map[string]bool
 }
 
-// Получатель-указатель: метод должен менять поле ran самого исполнителя.
+// Pointer receiver: the method must change the ran field of the executor itself.
 func (f *fakeExecutor) Run(_ context.Context, a Action) error {
 	f.ran = append(f.ran, a.RemovePath)
 	if f.failOn[a.RemovePath] {
@@ -58,7 +58,7 @@ func (f *fakeExecutor) Run(_ context.Context, a Action) error {
 	return nil
 }
 
-// item — короткий способ создать объект категории "<provider>.cache".
+// item is a short way to create an item of the "<provider>.cache" category.
 func item(provider, path string, size Bytes) Item {
 	return Item{ID: path, CategoryID: provider + ".cache", Name: path, Size: size}
 }
@@ -77,15 +77,15 @@ func TestBuildPlan(t *testing.T) {
 	})
 
 	t.Run("each provider plans only its own items", func(t *testing.T) {
-		// Given: отмечены объекты двух провайдеров
+		// Given: items of two providers are selected
 		sel := NewSelection()
 		mustAdd(t, sel, item("xcode", "/x/DerivedData", 100))
 		mustAdd(t, sel, item("npm", "/n/_cacache", 50))
 
-		// When: строим план
+		// When: we build the plan
 		plan, err := BuildPlan(sel, providers)
 
-		// Then: два шага, у каждого своё действие, общий размер — сумма
+		// Then: two steps, each with its own action, the total size is the sum
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -102,17 +102,17 @@ func TestBuildPlan(t *testing.T) {
 	})
 
 	t.Run("item that is blocked now is refused even if it got into the selection", func(t *testing.T) {
-		// Given: в выбор в обход Add попал запущенный объект
-		// (тест в том же пакете и может трогать приватное поле items)
+		// Given: a running item got into the selection bypassing Add
+		// (the test is in the same package and can touch the private items field)
 		sel := NewSelection()
 		running := item("xcode", "/x/running", 10)
 		running.Status = StatusRunning
 		sel.items[keyOf(running)] = running
 
-		// When: строим план
+		// When: we build the plan
 		_, err := BuildPlan(sel, providers)
 
-		// Then: план не построен, причина — "running"
+		// Then: no plan is built, the reason is "running"
 		var blocked *BlockedError
 		if !errors.As(err, &blocked) || blocked.Reason.Key != ReasonRunning {
 			t.Errorf("err = %v, want *BlockedError(running)", err)
@@ -120,7 +120,7 @@ func TestBuildPlan(t *testing.T) {
 	})
 
 	t.Run("provider error names the provider", func(t *testing.T) {
-		// Given: провайдер, который не может составить план
+		// Given: a provider that cannot make a plan
 		broken := fakeProvider{id: "broken", planErr: errors.New("docker is not running")}
 		sel := NewSelection()
 		mustAdd(t, sel, item("broken", "/b/x", 1))
@@ -128,7 +128,7 @@ func TestBuildPlan(t *testing.T) {
 		// When
 		_, err := BuildPlan(sel, []Provider{broken})
 
-		// Then: в ошибке видно, какой провайдер подвёл
+		// Then: the error shows which provider failed
 		if err == nil || err.Error() != "broken: docker is not running" {
 			t.Errorf("err = %v", err)
 		}
@@ -173,13 +173,13 @@ func TestExecute(t *testing.T) {
 	})
 
 	t.Run("one failed action does not stop the rest", func(t *testing.T) {
-		// Given: второе действие упадёт
+		// Given: the second action will fail
 		ex := &fakeExecutor{failOn: map[string]bool{"/b": true}}
 
 		// When
 		errs := Execute(context.Background(), plan, ex, nil)
 
-		// Then: выполнены все три, ошибка одна и в ней видно действие
+		// Then: all three ran, there is one error and it shows the action
 		if len(ex.ran) != 3 {
 			t.Errorf("ran = %v, want all 3", ex.ran)
 		}
@@ -189,7 +189,7 @@ func TestExecute(t *testing.T) {
 	})
 
 	t.Run("cancel stops before the next action", func(t *testing.T) {
-		// Given: контекст отменяют после первого действия
+		// Given: the context is cancelled after the first action
 		ctx, cancel := context.WithCancel(context.Background())
 		ex := &fakeExecutor{}
 
@@ -200,7 +200,7 @@ func TestExecute(t *testing.T) {
 			}
 		})
 
-		// Then: выполнено только первое, среди ошибок — отмена
+		// Then: only the first one ran, and the errors include the cancellation
 		if len(ex.ran) != 1 {
 			t.Errorf("ran = %v, want only /a", ex.ran)
 		}

@@ -55,24 +55,29 @@ With `go run .` the app runs from the Terminal: there's no Dock icon of its own,
 
 `go install github.com/mrWD/disk-cleaner@latest` doesn't work: the module is named `disk-cleaner`, not after its GitHub path.
 
-Code comments are in Russian.
-
 ## Using it
 
 - The **sidebar** lists the sections with how much each one found. At its bottom is the disk: free space and a bar like in macOS Storage, where each section's findings have the color of its icon. Under it are the **Rescan** and **Settings** buttons.
-- **Clean All** under the disk cleans everything marked Safe in every section. **Clean All** next to a section's search does the same for that section only. Caution items and anything running or in use are left out: select those yourself. Both buttons first open the same review window with every command, nothing is deleted before you confirm.
+- **Clean All Safe (size)** under the disk cleans everything marked Safe in every section. The **Clean All Safe** button next to a section's search does the same for that section only. If it shows 0 B, nothing in that section is both Safe and free to remove, for example because it's in use. Caution items and anything running or in use are left out: select those yourself. Both buttons first open the same review window with every command, nothing is deleted before you confirm.
 - **Search everywhere** with the field in the sidebar (⌘F). Results appear on the right, grouped by section, and each section in the sidebar shows how much it matched.
 - **Search in a section** with the field above its list.
 - A query is split into words, and each word must appear in the name, path or category title: `lingary node` finds `node_modules` from the Lingary worktree.
 - **Select All** selects what's visible right now (with a search, only the matches) and can be selected. Press it again to deselect. The checkbox in a category header selects the whole category.
+- **Never clean.** Select items and press **Never Clean** in the bottom bar: they stay in the list with a "Never clean" label, can't be selected, and Clean All Safe skips them. In **Settings → Never clean** you can remove entries or **Add Folder…**: everything inside that folder is skipped too. To take one item back, open its category and click **Allow cleaning**.
+- **Permissions.** On first launch, before the first scan, the app explains what it uses and why, with a switch for each. The same switches are in **Settings → Permissions**: looking in Downloads (macOS asks for access to that folder), project folders in Documents or Desktop if you keep projects there, and the administrator password (macOS asks for it each time, only to remove simulator caches; with it off, those items are skipped). macOS doesn't let apps change their own permissions, so to take one away completely use the **Open System Settings** link next to it.
 - **Checkboxes belong to the section you're looking at.** When you open another section or start a search, they're cleared, so you never clean something you can't see.
 - Everything is compact by default: one line per item (name, path, a Running/In use/Protected label, size). Click a category header to see what it is, why it's safe, what happens after cleaning, and full paths and reasons.
+
+## Support
+
+Disk Cleaner is free and has no ads. If it saved you some space, you can support it through [Buy Me a Coffee](https://buymeacoffee.com/ipupok), [Ko-fi](https://ko-fi.com/ipupok) or [PayPal](https://www.paypal.com/donate/?hosted_button_id=VBNDB5AHYLGCY). The same links are in **Settings**, along with the [project page](https://mrwd.github.io/products/disk-cleaner/).
 
 ## What it never deletes
 
 - Anything running (a container, simulator, emulator, the Gradle daemon, a process from a worktree): the checkbox is disabled and the reason is shown next to it.
 - Simulator entries that share a disk image, the newest runtime of each platform, and simulators whose runtime is missing.
 - Anything git tracks in a worktree.
+- Anything on your Never clean list, or inside a folder on it.
 - Your home folder, its top-level folders (`~/Projects`, `~/Library`…) and other apps' data (`~/Library/Application Support`, `Preferences`, `Keychains`, `Mail`…): the executor refuses even if a provider gets it wrong.
 - With the administrator password, it only removes paths inside `/Library/Developer/CoreSimulator/Caches`. Commands with administrator rights are forbidden.
 

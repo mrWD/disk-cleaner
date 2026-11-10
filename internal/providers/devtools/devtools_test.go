@@ -23,13 +23,13 @@ func write(t *testing.T, path, content string) {
 	}
 }
 
-// machine — домашняя папка, похожая на эту машину 09.11.2026:
-// Cursor, Claude, Claude Code и ChatGPT (Codex) установлены, а VS Code
-// и IntelliJ IDEA удалены, но оставили данные.
+// machine is a home folder that looks like this machine on Nov 9, 2026:
+// Cursor, Claude, Claude Code and ChatGPT (Codex) are installed, while VS Code
+// and IntelliJ IDEA are removed but left their data.
 type machine struct {
 	home      string
-	apps      string   // папка «Программы»
-	clis      []string // установленные команды
+	apps      string   // the Applications folder
+	clis      []string // installed commands
 	processes []string
 }
 
@@ -42,14 +42,14 @@ func newMachine(t *testing.T) *machine {
 	}
 	h := m.home
 
-	// Cursor: одно расширение установлено, его старая версия — нет.
+	// Cursor: one extension is installed, its old version is not.
 	write(t, filepath.Join(h, ".cursor/extensions/extensions.json"), `[{"relativeLocation": "eamodio.gitlens-19.2.0"}]`)
 	write(t, filepath.Join(h, ".cursor/extensions/eamodio.gitlens-19.2.0/package.json"), "{}")
 	write(t, filepath.Join(h, ".cursor/extensions/eamodio.gitlens-19.1.0/package.json"), "{}")
 	write(t, filepath.Join(h, "Library/Application Support/Cursor/CachedData/x.js"), "x")
-	write(t, filepath.Join(h, "Library/Application Support/Cursor/User/settings.json"), "{}") // настройки — не трогать
+	write(t, filepath.Join(h, "Library/Application Support/Cursor/User/settings.json"), "{}") // settings: do not touch
 
-	// Claude и Claude Code.
+	// Claude and Claude Code.
 	write(t, filepath.Join(h, "Library/Application Support/Claude/config.json"), "{}")
 	write(t, filepath.Join(h, ".claude/projects/p/session.jsonl"), "{}")
 	write(t, filepath.Join(h, ".local/share/claude/versions/2.1.220"), "old")
@@ -65,9 +65,9 @@ func newMachine(t *testing.T) *machine {
 	// Codex.
 	write(t, filepath.Join(h, ".cache/codex-runtimes/codex-primary-runtime/runtime.json"), `{"bundleVersion": "26.1024.11018"}`)
 	write(t, filepath.Join(h, ".codex/.tmp/git-1QTtGW/README.md"), "x")
-	write(t, filepath.Join(h, ".codex/sessions/chat.jsonl"), "{}") // история — не мусор
+	write(t, filepath.Join(h, ".codex/sessions/chat.jsonl"), "{}") // history is not junk
 
-	// Остатки удалённых VS Code и IntelliJ IDEA.
+	// Leftovers of the removed VS Code and IntelliJ IDEA.
 	write(t, filepath.Join(h, ".vscode/extensions/ms-python.python-2024.1.0/package.json"), "{}")
 	write(t, filepath.Join(h, ".vscode/argv.json"), "{}")
 	write(t, filepath.Join(h, "Library/Application Support/Code/User/settings.json"), "{}")
@@ -192,7 +192,7 @@ func TestScan(t *testing.T) {
 }
 
 func TestPlanNeverRemovesAHomeFolderItself(t *testing.T) {
-	// Given: остатки VS Code в ~/.vscode — папке прямо в домашней
+	// Given: VS Code leftovers in ~/.vscode, a folder directly in the home folder
 	m := newMachine(t)
 	p := m.provider()
 	items, _ := p.Scan(context.Background())
@@ -203,7 +203,7 @@ func TestPlanNeverRemovesAHomeFolderItself(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Then: удаляется содержимое (на два уровня глубже домашней), а не сама папка
+	// Then: the contents are deleted (two levels deeper than home), not the folder itself
 	if len(actions) != 2 {
 		t.Fatalf("actions = %v, want 2 (argv.json and extensions)", actions)
 	}
@@ -215,8 +215,8 @@ func TestPlanNeverRemovesAHomeFolderItself(t *testing.T) {
 }
 
 func TestLibraryCachesHaveOneOwner(t *testing.T) {
-	// Каждая папка ~/Library/Caches из таблицы инструментов должна быть
-	// в kit.LibraryCachesOwned — иначе её покажет ещё и «Кэши приложений».
+	// Every ~/Library/Caches folder from the tools table must be
+	// in kit.LibraryCachesOwned, otherwise "App caches & logs" will show it too.
 	for _, tl := range tools {
 		for _, path := range append(append([]string{}, tl.data...), tl.caches...) {
 			if name, ok := strings.CutPrefix(path, caches); ok && !kit.LibraryCachesOwned[name] {

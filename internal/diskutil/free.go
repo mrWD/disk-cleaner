@@ -1,37 +1,37 @@
-// Package diskutil — работа с диском: свободное место, размер папок.
-// Это инфраструктура: зависит от core, но не наоборот.
+// Package diskutil is disk work: free space, folder sizes.
+// This is infrastructure: it depends on core, not the other way round.
 package diskutil
 
 import (
 	"syscall"
 
-	"disk-cleaner/internal/core" // свои пакеты: имя модуля + путь к папке
+	"disk-cleaner/internal/core" // our own packages: module name + folder path
 )
 
-// FreeSpace возвращает свободное и общее место на диске, где лежит path.
-// Функция в Go может вернуть несколько значений. Последнее по традиции — ошибка.
+// FreeSpace returns the free and total space on the disk that holds path.
+// A Go function can return several values. By convention the last one is the error.
 //
-// Имя с большой буквы = функция видна из других пакетов (экспортируется).
-// С маленькой — только внутри diskutil. В Go это вместо public/private.
+// A name with a capital letter = the function is visible from other packages (exported).
+// With a lowercase letter it is visible only inside diskutil. Go uses this instead of public/private.
 func FreeSpace(path string) (core.Bytes, core.Bytes, error) {
-	// Пустая структура, которую заполнит система.
+	// An empty struct that the system will fill in.
 	var st syscall.Statfs_t
 
-	// &st — адрес структуры: Statfs записывает результат прямо в неё.
+	// &st is the struct's address: Statfs writes the result straight into it.
 	err := syscall.Statfs(path, &st)
 	if err != nil {
-		// Ошибки в Go не выбрасываются, а возвращаются. Проверяем сразу.
+		// Errors in Go aren't thrown, they're returned. We check right away.
 		return 0, 0, err
 	}
 
-	// Диск поделён на блоки одного размера.
-	// Bavail — свободные блоки, доступные обычному пользователю,
-	// Blocks — всего блоков, Bsize — размер блока в байтах.
-	// Типы у полей разные (uint64 и uint32), а Go сам числа не преобразует,
-	// поэтому приводим всё к int64 явно.
+	// The disk is divided into blocks of equal size.
+	// Bavail is the free blocks available to an ordinary user,
+	// Blocks is the total number of blocks, Bsize is the block size in bytes.
+	// The fields have different types (uint64 and uint32), and Go doesn't convert
+	// numbers by itself, so we convert everything to int64 explicitly.
 	blockSize := int64(st.Bsize)
 	free := core.Bytes(int64(st.Bavail) * blockSize)
 	total := core.Bytes(int64(st.Blocks) * blockSize)
 
-	return free, total, nil // nil — «ошибки нет»
+	return free, total, nil // nil means "no error"
 }

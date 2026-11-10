@@ -12,7 +12,7 @@ import (
 	"disk-cleaner/internal/providers/providertest"
 )
 
-// write создаёт файл размером чуть больше 1 МБ (меньше раздел не показывает).
+// write creates a file a bit over 1 MB (the section does not show smaller ones).
 func write(t *testing.T, path string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -27,8 +27,8 @@ func write(t *testing.T, path string) {
 	}
 }
 
-// fakeDownloads — «Загрузки» как на скриншоте Виктора, плюс архив, сборка
-// iOS-приложения, мелкий файл и обычный документ.
+// fakeDownloads is Downloads like in Viktor's screenshot, plus an archive, an iOS
+// app build, a small file and a regular document.
 func fakeDownloads(t *testing.T, hdiutil string) *Provider {
 	t.Helper()
 	dir := t.TempDir()
@@ -37,7 +37,7 @@ func fakeDownloads(t *testing.T, hdiutil string) *Provider {
 	write(t, filepath.Join(dir, "Lingary-191.aab"))
 	write(t, filepath.Join(dir, "Xcode_27.1.xip"))
 	write(t, filepath.Join(dir, "Lingary.xcarchive", "Info.plist"))
-	write(t, filepath.Join(dir, "report.pdf")) // документ — не наш
+	write(t, filepath.Join(dir, "report.pdf")) // a document: not ours
 	if err := os.WriteFile(filepath.Join(dir, "tiny.zip"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +64,7 @@ func TestScan(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		providertest.CheckCategories(t, New(), items)
+		providertest.CheckCategories(t, New(nil), items)
 
 		want := map[string]string{
 			"LM-Studio-0.4.26-4-arm64.dmg": catInstallers,
@@ -108,7 +108,7 @@ func TestScan(t *testing.T) {
 
 	t.Run("no access to Downloads is explained, not an error", func(t *testing.T) {
 		p := fakeDownloads(t, "")
-		if err := os.Chmod(p.dir, 0o000); err != nil { // так выглядит отказ macOS
+		if err := os.Chmod(p.dir, 0o000); err != nil { // this is what a macOS denial looks like
 			t.Fatal(err)
 		}
 		t.Cleanup(func() { _ = os.Chmod(p.dir, 0o755) })
@@ -136,5 +136,19 @@ func TestPlanMovesToTrash(t *testing.T) {
 }
 
 func TestTranslations(t *testing.T) {
-	providertest.CheckTranslations(t, New(), reasonNoAccess, reasonMounted)
+	providertest.CheckTranslations(t, New(nil), reasonNoAccess, reasonMounted, reasonTurnedOff)
+}
+
+func TestTurnedOff(t *testing.T) {
+	// Given: Downloads is switched off in Settings
+	p := &Provider{dir: t.TempDir(), enabled: func() bool { return false }}
+
+	// When
+	items, err := p.Scan(context.Background())
+
+	// Then: the section says it's off instead of scanning
+	var unavailable *core.UnavailableError
+	if !errors.As(err, &unavailable) || unavailable.Reason.Key != reasonTurnedOff || len(items) != 0 {
+		t.Errorf("items = %v, err = %v; want Unavailable(%s)", items, err, reasonTurnedOff)
+	}
 }

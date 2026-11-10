@@ -1,5 +1,5 @@
-// Package android — провайдер Android SDK: эмуляторы (AVD), системные
-// образы для них, версии NDK и исходники Android.
+// Package android is the provider for the Android SDK: emulators (AVDs), the system
+// images for them, NDK versions and the Android sources.
 package android
 
 import (
@@ -23,24 +23,24 @@ const (
 	catNDK          = "android.ndk"
 	catSources      = "android.sources"
 
-	// Причина: образ использует эмулятор (текст в translations).
+	// Reason: the emulator is using the image (text is in translations).
 	reasonUsedByEmulator = "android.used_by_emulator"
 )
 
-// Provider ищет файлы Android SDK в домашней папке.
+// Provider looks for Android SDK files in the home folder.
 type Provider struct {
 	sdk       string                             // ~/Library/Android/sdk
 	avdHome   string                             // ~/.android/avd
-	processes func(ctx context.Context) []string // список процессов; в тестах — фейк
+	processes func(ctx context.Context) []string // list of processes; a fake in tests
 }
 
-// New — провайдер для текущего пользователя.
+// New is the provider for the current user.
 func New() *Provider {
 	home := kit.Home()
 
-	sdk := os.Getenv("ANDROID_HOME") // из терминала может быть задан
+	sdk := os.Getenv("ANDROID_HOME") // it may be set from the terminal
 	if sdk == "" {
-		sdk = filepath.Join(home, "Library", "Android", "sdk") // где его ставит Android Studio
+		sdk = filepath.Join(home, "Library", "Android", "sdk") // where Android Studio installs it
 	}
 
 	return &Provider{
@@ -56,10 +56,10 @@ func (p *Provider) Translations() embed.FS { return translations }
 
 func (p *Provider) Categories() []core.Category {
 	return []core.Category{
-		{ID: catAVDs, Risk: core.RiskCaution}, // теряются приложения и данные внутри эмулятора
+		{ID: catAVDs, Risk: core.RiskCaution}, // apps and data inside the emulator are lost
 		{ID: catSystemImages, Risk: core.RiskCaution},
 		{ID: catNDK, Risk: core.RiskCaution},
-		// Исходники нужны только чтобы читать код Android в редакторе — сборка без них работает.
+		// The sources are only needed to read Android code in the editor; builds work without them.
 		{ID: catSources, Risk: core.RiskSafe},
 	}
 }
@@ -67,9 +67,9 @@ func (p *Provider) Categories() []core.Category {
 func (p *Provider) Scan(ctx context.Context) ([]core.Item, error) {
 	processes := p.processes(ctx)
 
-	// --- Эмуляторы: <avdHome>/<имя>.avd ---
+	// --- Emulators: <avdHome>/<name>.avd ---
 	var avdDirs []string
-	usedImages := map[string]string{} // системный образ → имя эмулятора, который его использует
+	usedImages := map[string]string{} // system image → name of the emulator that uses it
 	for _, dir := range kit.Subfolders(p.avdHome) {
 		if !strings.HasSuffix(dir, ".avd") {
 			continue
@@ -81,15 +81,15 @@ func (p *Provider) Scan(ctx context.Context) ([]core.Item, error) {
 	}
 
 	avds := kit.PathItems(ctx, catAVDs, avdDirs, avdName)
-	for i := range avds { // range по индексу, чтобы менять элементы на месте
+	for i := range avds { // range by index, so that we can change the elements in place
 		name := avds[i].Name
-		// Эмулятор запускают как "emulator -avd Имя" или "emulator @Имя".
+		// An emulator is started as "emulator -avd Name" or "emulator @Name".
 		if kit.AnyProcess(processes, "-avd "+name) || kit.AnyProcess(processes, "@"+name) {
 			avds[i].Status = core.StatusRunning
 		}
 	}
 
-	// --- Системные образы: <sdk>/system-images/<api>/<тип>/<архитектура> ---
+	// --- System images: <sdk>/system-images/<api>/<type>/<architecture> ---
 	var images []string
 	for _, api := range kit.Subfolders(filepath.Join(p.sdk, "system-images")) {
 		for _, tag := range kit.Subfolders(api) {
@@ -106,12 +106,12 @@ func (p *Provider) Scan(ctx context.Context) ([]core.Item, error) {
 		}
 	}
 
-	// --- NDK: <sdk>/ndk/<версия> ---
+	// --- NDK: <sdk>/ndk/<version> ---
 	ndks := kit.PathItems(ctx, catNDK, kit.Subfolders(filepath.Join(p.sdk, "ndk")), func(path string) string {
 		return "NDK " + filepath.Base(path)
 	})
 
-	// --- Исходники: <sdk>/sources/android-35 ---
+	// --- Sources: <sdk>/sources/android-35 ---
 	sources := kit.PathItems(ctx, catSources, kit.Subfolders(filepath.Join(p.sdk, "sources")), func(path string) string {
 		return "Sources " + filepath.Base(path)
 	})
@@ -124,8 +124,8 @@ func (p *Provider) Scan(ctx context.Context) ([]core.Item, error) {
 func (p *Provider) Plan(items []core.Item) ([]core.Action, error) {
 	actions := kit.RemoveActions(items)
 
-	// У эмулятора рядом с папкой Имя.avd лежит файл Имя.ini — удаляем и его,
-	// иначе Android Studio будет показывать «сломанный» эмулятор.
+	// Next to an emulator's Name.avd folder there is a Name.ini file; we delete it too,
+	// otherwise Android Studio will show a "broken" emulator.
 	for _, it := range items {
 		if it.CategoryID != catAVDs {
 			continue
@@ -154,16 +154,16 @@ func (p *Provider) imageName(path string) string {
 	return strings.ReplaceAll(rel, string(filepath.Separator), " · ")
 }
 
-// sysdir читает из config.ini эмулятора, какой системный образ он использует:
-// строка "image.sysdir.1=system-images/android-35/google_apis_playstore/arm64-v8a/".
+// sysdir reads from the emulator's config.ini which system image it uses:
+// the line "image.sysdir.1=system-images/android-35/google_apis_playstore/arm64-v8a/".
 func sysdir(configPath string) string {
 	f, err := os.Open(configPath)
 	if err != nil {
 		return ""
 	}
-	defer f.Close() // закрыть файл при выходе из функции
+	defer f.Close() // close the file when the function exits
 
-	// bufio.Scanner читает файл построчно.
+	// bufio.Scanner reads a file line by line.
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		key, value, found := strings.Cut(scanner.Text(), "=") // "a=b" → "a", "b", true

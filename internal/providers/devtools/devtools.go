@@ -1,13 +1,13 @@
-// Package devtools — провайдер «Инструменты разработки»: редакторы, IDE
-// и AI-помощники (Cursor, VS Code, Claude Code, Codex, JetBrains,
-// Android Studio и другие — список в tools.go).
+// Package devtools is the "Developer tools" provider: editors, IDEs
+// and AI assistants (Cursor, VS Code, Claude Code, Codex, JetBrains,
+// Android Studio and others; the list is in tools.go).
 //
-// Категории — по тому, что лежит, а в имени строки видно, чьё это:
-//   - остатки удалённых программ — программы нет, а данные остались;
-//   - старые версии — прошлые версии CLI, расширений и IDE;
-//   - кэши и временные файлы — пока программа работает, не трогаем;
-//   - скачанные среды выполнения (Codex);
-//   - только для информации — то, что правильно чистить в самой программе.
+// Categories go by what is lying there, and the row name shows whose it is:
+//   - leftovers of uninstalled apps: the app is gone but the data stayed;
+//   - old versions: earlier versions of CLIs, extensions and IDEs;
+//   - caches and temporary files: not touched while the app runs;
+//   - downloaded runtimes (Codex);
+//   - for information only: what is right to clean inside the app itself.
 package devtools
 
 import (
@@ -37,22 +37,22 @@ const (
 	catRuntimes    = "devtools.runtimes"
 	catInfo        = "devtools.info"
 
-	reasonRunning        = "devtools.running"         // программа запущена
-	reasonVersionRunning = "devtools.version_running" // запущена именно эта версия
-	reasonClaudeApp      = "devtools.claude_app"      // чистить в настройках Claude
-	reasonClaudeHistory  = "devtools.claude_history"  // история Claude Code
+	reasonRunning        = "devtools.running"         // the app is running
+	reasonVersionRunning = "devtools.version_running" // exactly this version is running
+	reasonClaudeApp      = "devtools.claude_app"      // clean it in the Claude settings
+	reasonClaudeHistory  = "devtools.claude_history"  // Claude Code history
 )
 
-// Provider ищет файлы инструментов разработки.
+// Provider looks for development tool files.
 type Provider struct {
 	home      string
-	appDirs   []string                       // где искать .app: /Applications и ~/Applications
-	hasCLI    func(name string) bool         // установлена ли команда; в тестах — фейк
-	processes func(context.Context) []string // список процессов; в тестах — фейк
+	appDirs   []string                       // where to look for .app: /Applications and ~/Applications
+	hasCLI    func(name string) bool         // whether the command is installed; a fake in tests
+	processes func(context.Context) []string // list of processes; a fake in tests
 	tools     []tool
 }
 
-// New — провайдер для текущего пользователя.
+// New is the provider for the current user.
 func New() *Provider {
 	home := kit.Home()
 	return &Provider{
@@ -73,7 +73,8 @@ func (p *Provider) Translations() embed.FS { return translations }
 
 func (p *Provider) Categories() []core.Category {
 	return []core.Category{
-		// Вместе с остатками уходят настройки — на случай, если программу поставят снова.
+		// Caution: the app's settings go away together with the leftovers, and
+		// they'd be missed if the app is installed again.
 		{ID: catLeftovers, Risk: core.RiskCaution},
 		{ID: catOldVersions, Risk: core.RiskSafe},
 		{ID: catCaches, Risk: core.RiskSafe},
@@ -82,7 +83,7 @@ func (p *Provider) Categories() []core.Category {
 	}
 }
 
-// found — что нашли до подсчёта размеров.
+// found is what we found before counting sizes.
 type found struct {
 	item core.Item
 	path string
@@ -92,7 +93,7 @@ func (p *Provider) Scan(ctx context.Context) ([]core.Item, error) {
 	processes := p.processes(ctx)
 	var all []found
 
-	// add — запомнить путь, если он существует.
+	// add remembers a path if it exists.
 	add := func(cat, toolName, label, path string, busy *core.Reason) {
 		if _, err := os.Lstat(path); err != nil {
 			return
@@ -112,7 +113,7 @@ func (p *Provider) Scan(ctx context.Context) ([]core.Item, error) {
 			running = &core.Reason{Key: reasonRunning, Args: map[string]any{"App": app}}
 		}
 
-		// Только для информации — всегда, установлена программа или нет.
+		// For information only: always, whether or not the app is installed.
 		for _, inf := range t.info {
 			path := p.abs(inf.path)
 			if _, err := os.Lstat(path); err == nil {
@@ -124,14 +125,14 @@ func (p *Provider) Scan(ctx context.Context) ([]core.Item, error) {
 		}
 
 		if !installed {
-			// Программы нет — всё, что от неё осталось, одной категорией.
+			// The app is gone: everything left of it goes into one category.
 			for _, d := range t.data {
 				add(catLeftovers, t.name, label(d), p.abs(d), running)
 			}
 			continue
 		}
 
-		// Старые версии CLI.
+		// Old CLI versions.
 		if t.versions != nil {
 			for _, v := range p.oldVersions(*t.versions) {
 				var busy *core.Reason
@@ -142,14 +143,14 @@ func (p *Provider) Scan(ctx context.Context) ([]core.Item, error) {
 			}
 		}
 
-		// Старые версии расширений: не используются, даже пока редактор открыт.
+		// Old extension versions: unused even while the editor is open.
 		if t.extDir != "" {
 			for _, dir := range obsoleteExtensions(p.abs(t.extDir)) {
 				add(catOldVersions, t.name, filepath.Base(dir), dir, nil)
 			}
 		}
 
-		// Кэши приложения на Electron и прочие кэши — заняты, пока программа работает.
+		// Electron app caches and other caches: busy while the app runs.
 		if t.support != "" {
 			for _, name := range electronCaches {
 				add(catCaches, t.name, name, filepath.Join(p.abs(t.support), name), running)
@@ -159,7 +160,7 @@ func (p *Provider) Scan(ctx context.Context) ([]core.Item, error) {
 			add(catCaches, t.name, label(c), p.abs(c), running)
 		}
 
-		// Скачанные среды выполнения: каждая подпапка — отдельная среда.
+		// Downloaded runtimes: each subfolder is a separate runtime.
 		for _, r := range t.runtimes {
 			for _, dir := range kit.Subfolders(p.abs(r)) {
 				add(catRuntimes, t.name, filepath.Base(dir), dir, running)
@@ -167,12 +168,12 @@ func (p *Provider) Scan(ctx context.Context) ([]core.Item, error) {
 		}
 	}
 
-	// JetBrains и Android Studio — папки по версиям.
+	// JetBrains and Android Studio: folders by version.
 	for _, f := range p.versionedFolders() {
 		all = append(all, f)
 	}
 
-	// Размеры — параллельно; пустое не показываем.
+	// Sizes in parallel; empty ones are not shown.
 	paths := make([]string, len(all))
 	for i, f := range all {
 		paths[i] = f.path
@@ -197,9 +198,9 @@ func (p *Provider) Scan(ctx context.Context) ([]core.Item, error) {
 	return items, nil
 }
 
-// Plan — удалить найденное. Папку прямо в домашней папке (~/.vscode)
-// исполнитель удалять целиком не разрешает — это защита от катастрофы.
-// Поэтому для неё удаляем всё, что внутри; пустая папка останется.
+// Plan deletes what was found. A folder directly in the home folder (~/.vscode)
+// is not allowed to be deleted whole by the executor: that protects against a disaster.
+// So for it we delete everything inside; the empty folder stays.
 func (p *Provider) Plan(items []core.Item) ([]core.Action, error) {
 	var actions []core.Action
 	for _, it := range items {
@@ -218,12 +219,12 @@ func (p *Provider) Plan(items []core.Item) ([]core.Action, error) {
 	return actions, nil
 }
 
-// abs — полный путь от домашней папки.
+// abs is the full path from the home folder.
 func (p *Provider) abs(rel string) string {
 	return filepath.Join(p.home, rel)
 }
 
-// installed — установлена ли программа: есть .app или команда в терминале.
+// installed tells whether the program is installed: there is an .app or a command in the terminal.
 func (p *Provider) installed(t tool) bool {
 	for _, app := range t.apps {
 		for _, dir := range p.appDirs {
@@ -240,7 +241,7 @@ func (p *Provider) installed(t tool) bool {
 	return false
 }
 
-// runningName — имя работающей программы ("" — не работает).
+// runningName is the name of the running program ("" means it is not running).
 func runningName(t tool, processes []string) string {
 	for _, app := range t.apps {
 		if kit.AnyProcess(processes, "/"+app+".app/") {
@@ -255,14 +256,14 @@ func runningName(t tool, processes []string) string {
 	return ""
 }
 
-// label — короткое имя пути для строки: без ~/ и Library/.
+// label is a short name of a path for a row: without ~/ and Library/.
 // "Library/Application Support/Code" → "Application Support/Code".
 func label(rel string) string {
 	return strings.TrimPrefix(rel, "Library/")
 }
 
-// oldVersions — версии CLI, кроме текущей (той, на которую указывает link).
-// Если ссылку прочитать не удалось, текущей считается самая новая по дате.
+// oldVersions are the CLI versions other than the current one (the one link points to).
+// If the link could not be read, the newest one by date counts as current.
 func (p *Provider) oldVersions(v versionsT) []string {
 	dir := p.abs(v.dir)
 	entries, err := os.ReadDir(dir)
@@ -298,9 +299,9 @@ func (p *Provider) oldVersions(v versionsT) []string {
 	})
 }
 
-// obsoleteExtensions — папки расширений, которые редактор больше не
-// использует: их нет в списке установленных (extensions.json).
-// Нет списка — не показываем ничего: без него нужное не отличить от старого.
+// obsoleteExtensions are extension folders the editor no longer
+// uses: they are not in the list of installed ones (extensions.json).
+// No list means we show nothing: without it, needed ones cannot be told from old ones.
 func obsoleteExtensions(extDir string) []string {
 	data, err := os.ReadFile(filepath.Join(extDir, "extensions.json"))
 	if err != nil {
@@ -330,10 +331,10 @@ func obsoleteExtensions(extDir string) []string {
 // versionRe — "IntelliJIdea2024.2" → "IntelliJIdea", "2024.2".
 var versionRe = regexp.MustCompile(`^(.*?)(\d{4}\.\d+)$`)
 
-// versionedFolders — папки JetBrains и Android Studio по версиям.
-// Программа установлена — показываем все версии, кроме самой новой
-// (после обновления IDE переносит настройки в новую папку, старая не нужна).
-// Не установлена — показываем все как остатки.
+// versionedFolders are the JetBrains and Android Studio folders by version.
+// If the app is installed, we show all versions except the newest
+// (after an update the IDE moves its settings to the new folder, the old one is not needed).
+// If it is not installed, we show all of them as leftovers.
 func (p *Provider) versionedFolders() []found {
 	var out []found
 
@@ -363,7 +364,7 @@ func (p *Provider) versionedFolders() []found {
 				cat := catLeftovers
 				if installed {
 					if d.version == newest {
-						continue // текущая версия — нужна
+						continue // current version: it is needed
 					}
 					cat = catOldVersions
 				}
@@ -377,7 +378,7 @@ func (p *Provider) versionedFolders() []found {
 	return out
 }
 
-// compareVersions сравнивает "2024.2" и "2025.1" как числа.
+// compareVersions compares "2024.2" and "2025.1" as numbers.
 func compareVersions(a, b string) int {
 	as, bs := strings.Split(a, "."), strings.Split(b, ".")
 	for i := range max(len(as), len(bs)) {
@@ -395,7 +396,7 @@ func compareVersions(a, b string) int {
 	return 0
 }
 
-// atoi — число из строки цифр (не цифры — 0).
+// atoi is a number from a string of digits (anything else gives 0).
 func atoi(s string) int {
 	n := 0
 	for _, r := range s {
@@ -407,7 +408,7 @@ func atoi(s string) int {
 	return n
 }
 
-// bundleVersion — версия сборки из runtime.json среды Codex ("" — нет).
+// bundleVersion is the build version from runtime.json of a Codex runtime ("" means none).
 func bundleVersion(dir string) string {
 	data, err := os.ReadFile(filepath.Join(dir, "runtime.json"))
 	if err != nil {

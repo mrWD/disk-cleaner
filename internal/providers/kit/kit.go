@@ -1,8 +1,8 @@
-// Package kit — общие кирпичики для провайдеров, которые ищут папки:
-// «папка → объект», «подпапки → объекты», «объекты → действия удаления».
+// Package kit holds shared building blocks for providers that look for folders:
+// "folder -> item", "subfolders -> items", "items -> delete actions".
 //
-// Провайдеры не импортируют друг друга, но могут пользоваться kit:
-// это такой же хелпер, как diskutil или shell.
+// Providers don't import each other, but they may use kit:
+// it is a helper just like diskutil or shell.
 package kit
 
 import (
@@ -19,34 +19,34 @@ import (
 	"disk-cleaner/internal/shell"
 )
 
-// LibraryCachesOwned — папки внутри ~/Library/Caches, у которых уже есть
-// провайдер-владелец («Кэши пакетов» или «Инструменты разработки»).
-// Провайдер «Кэши приложений» их пропускает: у каждого пути должен быть
-// ровно один владелец, иначе размер посчитается дважды, а удалить одно
-// и то же попытаются два раздела. Тесты в packagecaches и devtools
-// проверяют, что этот список не отстаёт от них.
+// LibraryCachesOwned lists folders inside ~/Library/Caches that already have
+// an owner provider ("Package caches" or "Developer tools").
+// The "App caches & logs" provider skips them: every path must have
+// exactly one owner, otherwise its size is counted twice and two sections
+// would try to delete the same thing. The tests in packagecaches and devtools
+// check that this list keeps up with them.
 var LibraryCachesOwned = map[string]bool{
 	"Yarn": true, "CocoaPods": true, "pip": true, "Homebrew": true, "go-build": true,
 	"org.swift.swiftpm": true, "ms-playwright": true, "ms-playwright-mcp": true,
 	"electron": true, "electron-builder": true, "ReactNative": true, "typescript": true,
 	"pnpm": true, "node-gyp": true, "dotslash": true, "com.apple.python": true,
 
-	// Инструменты разработки.
+	// Developer tools.
 	"claude-cli-nodejs": true, "com.openai.codex": true, "com.todesktop.230313mzl4w4u92": true,
 	"com.microsoft.VSCode": true, "dev.zed.Zed": true, "VisualStudio": true, "JetBrains": true,
 }
 
-// LibraryLogsOwned — то же для ~/Library/Logs: логи, которые показывает
-// раздел «Инструменты разработки».
+// LibraryLogsOwned is the same for ~/Library/Logs: logs shown by the
+// "Developer tools" section.
 var LibraryLogsOwned = map[string]bool{"JetBrains": true, "VisualStudio": true}
 
-// Home — домашняя папка текущего пользователя ("" если не удалось узнать).
+// Home is the current user's home folder ("" if it could not be found out).
 func Home() string {
-	home, _ := os.UserHomeDir() // _ — ошибку сознательно игнорируем
+	home, _ := os.UserHomeDir() // _ means we deliberately ignore the error
 	return home
 }
 
-// Tilde заменяет домашнюю папку на ~, чтобы пути в интерфейсе были короче:
+// Tilde replaces the home folder with ~ so paths in the UI are shorter:
 // /Users/viktor/.npm → ~/.npm.
 func Tilde(path string) string {
 	home := Home()
@@ -56,13 +56,13 @@ func Tilde(path string) string {
 	return path
 }
 
-// Workers — сколько папок считать одновременно: по числу ядер, но не больше 8.
+// Workers is how many folders to measure at once: one per CPU core, but at most 8.
 func Workers() int {
-	return min(runtime.NumCPU(), 8) // min — встроенная функция Go 1.21+
+	return min(runtime.NumCPU(), 8) // min is a built-in function since Go 1.21
 }
 
-// FolderItem — один объект из одной папки. Второе значение false,
-// если папки нет или она пустая: показывать там нечего.
+// FolderItem is one item made from one folder. The second value is false
+// if the folder is missing or empty: there is nothing to show.
 func FolderItem(ctx context.Context, categoryID, name, path string) (core.Item, bool) {
 	size, err := diskutil.DirSize(ctx, path)
 	if err != nil || size == 0 {
@@ -78,7 +78,7 @@ func FolderItem(ctx context.Context, categoryID, name, path string) (core.Item, 
 	}, true
 }
 
-// Subfolders — полные пути подпапок parent по алфавиту. Нет папки — пустой срез.
+// Subfolders returns the full paths of parent's subfolders in alphabetical order. No folder means an empty slice.
 func Subfolders(parent string) []string {
 	entries, err := os.ReadDir(parent)
 	if err != nil {
@@ -94,8 +94,8 @@ func Subfolders(parent string) []string {
 	return out
 }
 
-// PathItems — по объекту на каждый путь, размеры считаются параллельно.
-// name делает из пути имя для показа. Пустые папки пропускаются.
+// PathItems makes one item per path; sizes are measured in parallel.
+// name turns a path into a display name. Empty folders are skipped.
 func PathItems(ctx context.Context, categoryID string, paths []string, name func(path string) string) []core.Item {
 	sizes := diskutil.SizeAll(ctx, paths, Workers())
 
@@ -113,18 +113,18 @@ func PathItems(ctx context.Context, categoryID string, paths []string, name func
 		})
 	}
 
-	// Самое большое — сверху: ради него пользователь и пришёл.
-	// cmp.Compare возвращает -1, 0 или 1; b и a переставлены — сортировка по убыванию.
+	// Biggest on top: that is what the user came for.
+	// cmp.Compare returns -1, 0 or 1; b and a are swapped, so the sort is descending.
 	slices.SortFunc(items, func(a, b core.Item) int { return cmp.Compare(b.Size, a.Size) })
 	return items
 }
 
-// BaseName — имя для показа: последняя часть пути.
+// BaseName is the display name: the last part of the path.
 func BaseName(path string) string {
 	return filepath.Base(path)
 }
 
-// RemoveActions — по действию «удалить путь» на каждый объект (ID — это путь).
+// RemoveActions makes one "delete this path" action per item (the ID is the path).
 func RemoveActions(items []core.Item) []core.Action {
 	actions := make([]core.Action, 0, len(items))
 	for _, it := range items {
@@ -133,10 +133,10 @@ func RemoveActions(items []core.Item) []core.Action {
 	return actions
 }
 
-// Processes — командные строки всех запущенных процессов. Нужно, чтобы
-// узнать, что сейчас запущено: эмулятор Android, демон Gradle, dev-сервер.
+// Processes returns the command lines of all running processes. It is needed to
+// find out what is running right now: an Android emulator, a Gradle daemon, a dev server.
 func Processes(ctx context.Context) []string {
-	// ps -axo command= — все процессы, только командная строка, без заголовка.
+	// ps -axo command= means all processes, command line only, no header.
 	out, err := shell.Run(ctx, "/bin/ps", "-axo", "command=")
 	if err != nil {
 		return nil
@@ -144,20 +144,20 @@ func Processes(ctx context.Context) []string {
 	return strings.Split(string(out), "\n")
 }
 
-// AnyProcess — есть ли процесс, в командной строке которого есть substr.
+// AnyProcess reports whether any process has substr in its command line.
 func AnyProcess(processes []string, substr string) bool {
 	return FindProcess(processes, substr) != ""
 }
 
-// FindProcess — имя программы первого процесса, в командной строке
-// которого есть substr, или "" если такого нет:
+// FindProcess returns the program name of the first process whose command line
+// contains substr, or "" if there is none:
 // "/usr/bin/java -cp … GradleDaemon" → "java".
 func FindProcess(processes []string, substr string) string {
 	for _, p := range processes {
 		if !strings.Contains(p, substr) {
 			continue
 		}
-		fields := strings.Fields(p) // разбить по пробелам
+		fields := strings.Fields(p) // split on whitespace
 		if len(fields) == 0 {
 			return "?"
 		}

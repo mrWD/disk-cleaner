@@ -1,7 +1,7 @@
-// Package xcode — провайдер файлов Xcode: сборки (DerivedData), архивы,
-// символы устройств, кэш документации, превью SwiftUI.
+// Package xcode is the provider for Xcode files: builds (DerivedData), archives,
+// device support symbols, the documentation cache, SwiftUI previews.
 //
-// Симуляторы — отдельный провайдер (simulators): у них свои правила защиты.
+// Simulators are a separate provider (simulators): they have their own protection rules.
 package xcode
 
 import (
@@ -15,13 +15,13 @@ import (
 	"disk-cleaner/internal/providers/kit"
 )
 
-// //go:embed — указание компилятору: вшить папку translations в программу.
-// Комментарий должен стоять прямо над переменной типа embed.FS.
+// //go:embed is an instruction to the compiler: bake the translations folder into the program.
+// The comment must sit right above a variable of type embed.FS.
 //
 //go:embed translations
 var translations embed.FS
 
-// ID категорий. Начинаются с ID провайдера — это проверяет providertest.
+// Category IDs. They start with the provider ID; providertest checks that.
 const (
 	catDerivedData   = "xcode.derived_data"
 	catArchives      = "xcode.archives"
@@ -30,12 +30,12 @@ const (
 	catPreviews      = "xcode.previews"
 )
 
-// Provider ищет файлы Xcode в домашней папке.
+// Provider looks for Xcode files in the home folder.
 type Provider struct {
-	home string // поле, а не вызов os.UserHomeDir(): в тестах подставим временную папку
+	home string // a field, not a call to os.UserHomeDir(): in tests we substitute a temp folder
 }
 
-// New — провайдер для текущего пользователя.
+// New is the provider for the current user.
 func New() *Provider {
 	return &Provider{home: kit.Home()}
 }
@@ -47,27 +47,27 @@ func (p *Provider) Translations() embed.FS { return translations }
 func (p *Provider) Categories() []core.Category {
 	return []core.Category{
 		{ID: catDerivedData, Risk: core.RiskSafe},
-		{ID: catArchives, Risk: core.RiskCaution}, // нужны для расшифровки крэшей
+		{ID: catArchives, Risk: core.RiskCaution}, // needed to decode crashes
 		{ID: catDeviceSupport, Risk: core.RiskSafe},
 		{ID: catDocumentation, Risk: core.RiskSafe},
 		{ID: catPreviews, Risk: core.RiskSafe},
 	}
 }
 
-// xcodeDir — путь внутри ~/Library/Developer/Xcode.
+// xcodeDir is a path inside ~/Library/Developer/Xcode.
 func (p *Provider) xcodeDir(parts ...string) string {
-	// append([]string{...}, parts...) — склеить два среза в один.
+	// append([]string{...}, parts...) joins two slices into one.
 	return filepath.Join(append([]string{p.home, "Library", "Developer", "Xcode"}, parts...)...)
 }
 
 func (p *Provider) Scan(ctx context.Context) ([]core.Item, error) {
 	var items []core.Item
 
-	// DerivedData: по объекту на проект.
+	// DerivedData: one item per project.
 	derived := kit.Subfolders(p.xcodeDir("DerivedData"))
 	items = append(items, kit.PathItems(ctx, catDerivedData, derived, projectName)...)
 
-	// Archives: ~/…/Archives/<дата>/<имя>.xcarchive
+	// Archives: ~/…/Archives/<date>/<name>.xcarchive
 	var archives []string
 	for _, day := range kit.Subfolders(p.xcodeDir("Archives")) {
 		for _, a := range kit.Subfolders(day) {
@@ -78,34 +78,34 @@ func (p *Provider) Scan(ctx context.Context) ([]core.Item, error) {
 	}
 	items = append(items, kit.PathItems(ctx, catArchives, archives, archiveName)...)
 
-	// Символы устройств: "iOS DeviceSupport/<модель> <версия> (<сборка>)".
+	// Device support symbols: "iOS DeviceSupport/<model> <version> (<build>)".
 	var support []string
 	for _, platform := range []string{"iOS", "watchOS", "tvOS", "visionOS", "xrOS", "macOS"} {
 		support = append(support, kit.Subfolders(p.xcodeDir(platform+" DeviceSupport"))...)
 	}
 	items = append(items, kit.PathItems(ctx, catDeviceSupport, support, deviceSupportName)...)
 
-	// Документация: две папки, каждая — один объект.
+	// Documentation: two folders, each is one item.
 	docs := []string{p.xcodeDir("DocumentationCache"), p.xcodeDir("DocumentationIndex")}
 	items = append(items, kit.PathItems(ctx, catDocumentation, docs, kit.BaseName)...)
 
-	// Превью SwiftUI.
+	// SwiftUI previews.
 	if it, ok := kit.FolderItem(ctx, catPreviews, "Previews", p.xcodeDir("UserData", "Previews")); ok {
 		items = append(items, it)
 	}
 
-	// Ошибки здесь не бывает: нет папки — значит, нечего показать.
+	// There is no error case here: no folder means there is nothing to show.
 	return items, nil
 }
 
-// Plan: каждый объект — папка, её и удаляем.
+// Plan: every item is a folder, and that folder is what we delete.
 func (p *Provider) Plan(items []core.Item) ([]core.Action, error) {
 	return kit.RemoveActions(items), nil
 }
 
-// derivedSuffix — хвост, который Xcode добавляет к имени проекта:
-// "Lingary-bxqjcmhlwrsvdyfkqlfxonbsnjcn". regexp.MustCompile компилирует
-// регулярное выражение один раз при запуске программы.
+// derivedSuffix is the tail Xcode adds to a project name:
+// "Lingary-bxqjcmhlwrsvdyfkqlfxonbsnjcn". regexp.MustCompile compiles
+// the regular expression once, when the program starts.
 var derivedSuffix = regexp.MustCompile(`-[a-z]{28}$`)
 
 // projectName: "Lingary-bxqj…" → "Lingary".

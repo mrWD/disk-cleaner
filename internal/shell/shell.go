@@ -1,8 +1,8 @@
-// Package shell — запуск внешних программ (docker, xcrun, git, ps).
+// Package shell runs external programs (docker, xcrun, git, ps).
 //
-// Несмотря на имя, командная оболочка (zsh, bash) здесь не участвует:
-// программа запускается напрямую, аргументы передаются списком.
-// Поэтому пробелы, кавычки и ; в аргументах не могут «сломать» команду.
+// Despite the name, no command shell (zsh, bash) is involved here:
+// the program is started directly and the arguments are passed as a list.
+// So spaces, quotes and ; in the arguments can't "break" the command.
 package shell
 
 import (
@@ -15,11 +15,11 @@ import (
 	"strings"
 )
 
-// extraDirs — где искать программы, кроме PATH.
+// extraDirs is where to look for programs besides PATH.
 //
-// Приложение, запущенное из Finder (а не из терминала), получает урезанный
-// PATH: /usr/bin:/bin:/usr/sbin:/sbin. Без этих папок оно не нашло бы
-// brew, docker, go и помощники docker для входа в реестры.
+// An app launched from Finder (not from a terminal) gets a trimmed-down
+// PATH: /usr/bin:/bin:/usr/sbin:/sbin. Without these folders it wouldn't find
+// brew, docker, go, or docker's registry-login helpers.
 func extraDirs() []string {
 	dirs := []string{
 		"/opt/homebrew/bin",
@@ -40,12 +40,12 @@ func extraDirs() []string {
 	return dirs
 }
 
-// searchPath — PATH процесса плюс extraDirs, без повторов.
+// searchPath is the process's PATH plus extraDirs, without duplicates.
 func searchPath() []string {
 	seen := map[string]bool{}
 	var out []string
 
-	// filepath.SplitList разбивает строку PATH по двоеточиям.
+	// filepath.SplitList splits the PATH string on colons.
 	for _, dir := range append(filepath.SplitList(os.Getenv("PATH")), extraDirs()...) {
 		if dir != "" && !seen[dir] {
 			seen[dir] = true
@@ -56,8 +56,8 @@ func searchPath() []string {
 	return out
 }
 
-// LookPath находит программу по имени и возвращает полный путь к ней.
-// Второе значение — нашлась ли программа.
+// LookPath finds a program by name and returns the full path to it.
+// The second value tells whether the program was found.
 func LookPath(name string) (string, bool) {
 	if filepath.IsAbs(name) {
 		info, err := os.Stat(name)
@@ -67,7 +67,7 @@ func LookPath(name string) (string, bool) {
 	for _, dir := range searchPath() {
 		full := filepath.Join(dir, name)
 		info, err := os.Stat(full)
-		// Mode()&0o111 — есть ли у файла право на запуск (бит x).
+		// Mode()&0o111 checks whether the file has the execute permission (the x bit).
 		if err == nil && !info.IsDir() && info.Mode()&0o111 != 0 {
 			return full, true
 		}
@@ -76,8 +76,8 @@ func LookPath(name string) (string, bool) {
 	return "", false
 }
 
-// Env — окружение для запускаемых программ: текущее, но с полным PATH.
-// docker, например, сам ищет в PATH своего помощника docker-credential-desktop.
+// Env is the environment for the programs we start: the current one, but with the full PATH.
+// docker, for example, looks in PATH for its own helper docker-credential-desktop.
 func Env() []string {
 	env := os.Environ()
 	path := "PATH=" + strings.Join(searchPath(), string(os.PathListSeparator))
@@ -92,21 +92,21 @@ func Env() []string {
 	return append(env, path)
 }
 
-// Runner — функция запуска программы. Провайдеры получают её снаружи,
-// чтобы в тестах подставить фейк с заранее записанным выводом
-// и не зависеть от того, установлен ли на машине docker.
+// Runner is a function that runs a program. Providers receive it from outside,
+// so that tests can plug in a fake with prerecorded output
+// and not depend on whether docker is installed on the machine.
 type Runner func(ctx context.Context, name string, args ...string) ([]byte, error)
 
-// Run запускает программу и возвращает её стандартный вывод.
-// Если программа завершилась с ошибкой, ошибка содержит её stderr:
-// иначе было бы непонятно, почему docker «упал».
+// Run starts a program and returns its standard output.
+// If the program exits with an error, the error contains its stderr:
+// otherwise it would be unclear why docker "crashed".
 func Run(ctx context.Context, name string, args ...string) ([]byte, error) {
 	path, ok := LookPath(name)
 	if !ok {
 		return nil, fmt.Errorf("%s: %w", name, exec.ErrNotFound)
 	}
 
-	// CommandContext убьёт процесс, если ctx отменят или истечёт его таймаут.
+	// CommandContext kills the process if ctx is cancelled or its timeout expires.
 	cmd := exec.CommandContext(ctx, path, args...)
 	cmd.Env = Env()
 
@@ -119,7 +119,7 @@ func Run(ctx context.Context, name string, args ...string) ([]byte, error) {
 		if msg == "" {
 			msg = strings.TrimSpace(stdout.String())
 		}
-		// %w «заворачивает» исходную ошибку: errors.Is/As смогут до неё добраться.
+		// %w "wraps" the original error so that errors.Is/As can reach it.
 		return stdout.Bytes(), fmt.Errorf("%s %s: %w: %s", name, strings.Join(args, " "), err, msg)
 	}
 

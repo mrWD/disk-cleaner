@@ -1,41 +1,41 @@
 #!/bin/sh
-# Собирает Disk Cleaner.app и, с флагом --install, ставит его в /Applications.
+# Builds Disk Cleaner.app and, with the --install flag, installs it into /Applications.
 #
-# Сначала сам ставит то, чего не хватает для сборки:
-#   1. Xcode Command Line Tools — компилятор C: Fyne собирает часть себя из C;
-#   2. Go — через Homebrew, а если его нет, официальным архивом с go.dev
-#      в ~/sdk (пароль администратора не нужен);
-#   3. fyne — программа, которая упаковывает собранный файл в .app.
+# First it installs whatever is missing for the build:
+#   1. Xcode Command Line Tools — the C compiler: Fyne builds part of itself from C;
+#   2. Go — through Homebrew, or if that is missing, from the official archive
+#      from go.dev into ~/sdk (no administrator password needed);
+#   3. fyne — the tool that packs the built binary into an .app.
 #
-# Потом:
-#   4. собирает приложение (fyne package);
-#   5. добавляет в Info.plist текст, который macOS показывает, когда
-#      приложение просит доступ к «Загрузкам» (NSDownloadsFolderUsageDescription);
-#   6. заново подписывает приложение (ad-hoc, без сертификата разработчика):
-#      после правки Info.plist старая подпись перестаёт сходиться.
+# Then:
+#   4. builds the app (fyne package);
+#   5. adds to Info.plist the text that macOS shows when the app asks for
+#      access to Downloads (NSDownloadsFolderUsageDescription);
+#   6. signs the app again (ad-hoc, without a developer certificate):
+#      after Info.plist is edited, the old signature no longer matches.
 #
-# Запуск из любой папки:
-#   ./scripts/build.sh            — только собрать в dist/
-#   ./scripts/build.sh --install  — собрать, поставить в /Applications и открыть
-#                                   (запущенная копия закроется, старая заменится)
+# Run it from any folder:
+#   ./scripts/build.sh            — only build into dist/
+#   ./scripts/build.sh --install  — build, install into /Applications and open it
+#                                   (a running copy is closed, the old one is replaced)
 set -e
 cd "$(dirname "$0")/.."
 
 APP="Disk Cleaner.app"
 PLIST="$APP/Contents/Info.plist"
 TEXT="Disk Cleaner looks in Downloads for installers, app builds and archives you may no longer need. Nothing is removed without your confirmation, and files go to the Trash."
-FYNE_VERSION="v1.7.4" # версия, с которой проект проверен
+FYNE_VERSION="v1.7.4" # the version the project was tested with
 
-# Нужная версия Go — из go.mod (строка "go 1.27.3").
+# The Go version we need comes from go.mod (the line "go 1.27.3").
 GO_VERSION="$(awk '$1 == "go" { print $2 }' go.mod)"
 
-# Где обычно лежат Homebrew, Go и программы, поставленные через go install.
-# В PATH их может не быть, например, если Homebrew поставили, но не
-# добавили в ~/.zprofile.
+# Where Homebrew, Go and programs installed with go install usually live.
+# They may be missing from PATH, for example if Homebrew was installed but
+# not added to ~/.zprofile.
 PATH="$PATH:/opt/homebrew/bin:/usr/local/bin:/usr/local/go/bin:$HOME/go/bin:$HOME/sdk/go$GO_VERSION/bin"
 export PATH
 
-# Если в окружении стоит GOTOOLCHAIN=local, Go не скачает нужную версию сам.
+# If the environment has GOTOOLCHAIN=local, Go won't download the version it needs by itself.
 export GOTOOLCHAIN=auto
 
 step() { printf '\n==> %s\n' "$1"; }
@@ -45,15 +45,15 @@ if ! xcode-select -p >/dev/null 2>&1; then
 	step "Installing Xcode Command Line Tools (a macOS window will open, click Install)"
 	xcode-select --install 2>/dev/null || true
 	echo "Waiting for the installation to finish. If you closed that window, press Ctrl+C and run this script again."
-	# Установка идёт в отдельном окне macOS — ждём, пока она закончится.
+	# The installation runs in a separate macOS window; we wait until it finishes.
 	until xcode-select -p >/dev/null 2>&1; do sleep 5; done
 fi
 
 # --- 2. Go ---
 
-# go_ok — есть ли Go, который справится сам. С версии 1.21 Go, увидев
-# в go.mod версию новее себя, сам скачивает нужную (GOTOOLCHAIN=auto).
-# Более старый так не умеет — его считаем как отсутствующий.
+# go_ok tells whether there is a Go that can cope by itself. Since version 1.21, when Go sees
+# a newer version than its own in go.mod, it downloads the needed one itself (GOTOOLCHAIN=auto).
+# An older Go can't do that, so we treat it as missing.
 go_ok() {
 	command -v go >/dev/null 2>&1 || return 1
 	v="$(go env GOVERSION 2>/dev/null | sed 's/^go//')" # "go1.27.3" → "1.27.3"
@@ -72,7 +72,7 @@ if ! go_ok; then
 			brew install go
 		fi
 	else
-		# Homebrew нет — берём официальный архив Go и кладём его в ~/sdk.
+		# No Homebrew: take the official Go archive and put it into ~/sdk.
 		case "$(uname -m)" in
 		arm64) ARCH=arm64 ;;
 		*) ARCH=amd64 ;;
@@ -101,7 +101,7 @@ if [ ! -x "$FYNE" ]; then
 	FYNE="$GOBIN_DIR/fyne"
 fi
 
-# --- 4–6. Сборка ---
+# --- 4–6. Build ---
 step "Building $APP (the first build takes a few minutes)"
 "$FYNE" package -os darwin -release
 
@@ -116,17 +116,17 @@ mv "$APP" dist/
 echo "Built: dist/$APP"
 
 if [ "$1" = "--install" ]; then
-	# Закрыть запущенную копию, чтобы заменить её, и поставить новую.
-	# Переносим, а не копируем: иначе в dist/ остаётся вторая копия,
-	# и Spotlight с Launchpad показывают два одинаковых Disk Cleaner.
+	# Close the running copy so we can replace it, and install the new one.
+	# We move rather than copy: otherwise a second copy stays in dist/,
+	# and Spotlight and Launchpad show two identical Disk Cleaners.
 	step "Installing to /Applications"
 	osascript -e 'quit app "Disk Cleaner"' 2>/dev/null || true
 	rm -rf "/Applications/$APP"
 	mv "dist/$APP" "/Applications/$APP"
 	echo "Installed: /Applications/$APP"
 
-	# Сразу после закрытия старой копии macOS иногда отвечает ошибкой
-	# -600/-609 — тогда просто пробуем ещё раз чуть позже.
+	# Right after the old copy is closed, macOS sometimes answers with error
+	# -600/-609; then we just try again a bit later.
 	sleep 1
 	open "/Applications/$APP" 2>/dev/null || { sleep 2; open "/Applications/$APP"; }
 fi

@@ -11,7 +11,7 @@ import (
 	"disk-cleaner/internal/providers/providertest"
 )
 
-// write создаёт файл с содержимым (и все папки до него).
+// write creates a file with content (and all folders leading to it).
 func write(t *testing.T, path, content string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -22,9 +22,9 @@ func write(t *testing.T, path, content string) {
 	}
 }
 
-// fakeSDK — временные SDK и папка эмуляторов, как на этом Mac:
-// эмулятор Lingary_Test на android-35, лишний образ android-34, два NDK
-// и исходники android-35.
+// fakeSDK is a temporary SDK and emulators folder, like on this Mac:
+// emulator Lingary_Test on android-35, an extra android-34 image, two NDKs
+// and the android-35 sources.
 func fakeSDK(t *testing.T, processes ...string) *Provider {
 	t.Helper()
 	home := t.TempDir()

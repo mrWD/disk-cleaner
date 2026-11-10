@@ -13,8 +13,8 @@ import (
 	"disk-cleaner/internal/shell"
 )
 
-// git запускает настоящий git. Дата коммита задаётся через переменные
-// окружения GIT_*_DATE — так можно сделать «старый» проект.
+// git runs the real git. The commit date is set through the GIT_*_DATE
+// environment variables, which is how we make an "old" project.
 func git(t *testing.T, date, dir string, args ...string) {
 	t.Helper()
 	t.Setenv("GIT_AUTHOR_DATE", date)
@@ -35,22 +35,22 @@ func write(t *testing.T, path string) {
 	}
 }
 
-// repo создаёт репозиторий с одним коммитом на дату date.
+// repo creates a repository with one commit dated date.
 func repo(t *testing.T, dir, date string) {
 	t.Helper()
 	write(t, filepath.Join(dir, ".gitignore"))
-	write(t, filepath.Join(dir, "build", "tracked.txt")) // build отслеживается — не трогать
+	write(t, filepath.Join(dir, "build", "tracked.txt")) // build is tracked, so do not touch it
 	git(t, date, filepath.Dir(dir), "init", "-q", dir)
 	git(t, date, dir, "add", ".")
 	git(t, date, dir, "commit", "-q", "-m", "init")
 	write(t, filepath.Join(dir, "node_modules", "react", "index.js"))
 }
 
-// today — «сейчас» в тестах.
+// today is "now" in the tests.
 var today = time.Date(2026, 11, 9, 12, 0, 0, 0, time.UTC)
 
-// fakeProjects — папка проектов: давно заброшенный meal-plan, активный
-// courses с worktree внутри и вложенный appose2/frontend.
+// fakeProjects is a projects folder: a long-abandoned meal-plan, an active
+// courses with a worktree inside, and a nested appose2/frontend.
 func fakeProjects(t *testing.T, processes ...string) (*Provider, string) {
 	t.Helper()
 	root, _ := filepath.EvalSymlinks(t.TempDir())
@@ -59,7 +59,7 @@ func fakeProjects(t *testing.T, processes ...string) (*Provider, string) {
 	repo(t, filepath.Join(root, "courses"), "2026-11-08T10:00:00")
 	repo(t, filepath.Join(root, "appose2", "frontend"), "2026-10-01T10:00:00")
 
-	// Worktree внутри courses — его node_modules принадлежат провайдеру worktrees.
+	// A worktree inside courses: its node_modules belong to the worktrees provider.
 	wt := filepath.Join(root, "courses", ".claude", "worktrees", "merge-main")
 	git(t, "2026-11-08T10:00:00", filepath.Join(root, "courses"), "worktree", "add", "-q", "-b", "next", wt)
 	write(t, filepath.Join(wt, "node_modules", "react", "index.js"))
@@ -155,9 +155,9 @@ func TestTranslations(t *testing.T) {
 func TestLeftoverBuilds(t *testing.T) {
 	ctx := context.Background()
 
-	// Given: проект, где рядом с кодом лежат архив Xcode (git его не знает)
-	// и демо-APK, закоммиченный в репозиторий; плюс release/ от electron-builder,
-	// который git игнорирует.
+	// Given: a project with an Xcode archive next to the code (git does not know it)
+	// and a demo APK committed to the repository; plus release/ from electron-builder,
+	// which git ignores.
 	root, _ := filepath.EvalSymlinks(t.TempDir())
 	dir := filepath.Join(root, "lingary-review")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -187,8 +187,8 @@ func TestLeftoverBuilds(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Then: архив — в «Оставленных сборках», release/ — как папка сборки,
-	// а закоммиченный APK не предлагается вовсе.
+	// Then: the archive is under "Leftover builds", release/ is a build folder,
+	// and the committed APK is not offered at all.
 	if got := byName(items, "lingary-review · Lingary-191.xcarchive").CategoryID; got != catBuilds {
 		t.Errorf("xcarchive category = %q, want %q", got, catBuilds)
 	}

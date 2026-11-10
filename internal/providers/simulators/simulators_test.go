@@ -12,8 +12,8 @@ import (
 	"disk-cleaner/internal/providers/providertest"
 )
 
-// runtimesOnNov8 — состояние машины утром 08.11.2026: три записи iOS 27.0
-// указывают на один образ (две из них «Unusable»), плюс старые версии.
+// runtimesOnNov8 is the state of the machine on the morning of Nov 8, 2026: three iOS 27.0
+// entries point to one image (two of them "Unusable"), plus old versions.
 const runtimesOnNov8 = `{
   "AAA": {"identifier": "AAA", "version": "27.0", "build": "24A434", "state": "Ready", "sizeBytes": 7500000000,
           "path": "/System/Library/AssetsV2/ios27/AssetData", "platformIdentifier": "com.apple.platform.iphonesimulator",
@@ -32,8 +32,8 @@ const runtimesOnNov8 = `{
           "runtimeIdentifier": "com.apple.CoreSimulator.SimRuntime.xrOS-2-5", "deletable": true}
 }`
 
-// devicesOnNov8 — iPad для скриншотов, у которого «потерялась» iOS 27.0,
-// и запущенный iPhone на iOS 18.4.
+// devicesOnNov8: an iPad for screenshots that "lost" its iOS 27.0,
+// and a running iPhone on iOS 18.4.
 const devicesOnNov8 = `{"devices": {
   "com.apple.CoreSimulator.SimRuntime.iOS-27-0": [
     {"udid": "D68E", "name": "iPad Pro 13 store", "state": "Shutdown", "isAvailable": false,
@@ -44,7 +44,7 @@ const devicesOnNov8 = `{"devices": {
   ]
 }}`
 
-// fakeSimctl — провайдер, который вместо xcrun отдаёт записанный JSON.
+// fakeSimctl is a provider that returns recorded JSON instead of calling xcrun.
 func fakeSimctl(t *testing.T) *Provider {
 	t.Helper()
 	return &Provider{
@@ -58,7 +58,7 @@ func fakeSimctl(t *testing.T) *Provider {
 	}
 }
 
-// find — объект по ID.
+// find returns an item by ID.
 func find(t *testing.T, items []core.Item, id string) core.Item {
 	t.Helper()
 	i := slices.IndexFunc(items, func(it core.Item) bool { return it.ID == id })
@@ -68,7 +68,7 @@ func find(t *testing.T, items []core.Item, id string) core.Item {
 	return items[i]
 }
 
-// whyNot — ключ причины, почему объект нельзя выбрать ("" — можно).
+// whyNot is the key of the reason an item cannot be selected ("" means it can).
 func whyNot(it core.Item) string {
 	if ok, why := it.CanSelect(); !ok {
 		return why.Key
@@ -98,15 +98,15 @@ func TestScanProtectsWhatWeLostOnNov8(t *testing.T) {
 	})
 
 	t.Run("newest runtime of a platform is protected", func(t *testing.T) {
-		// visionOS 2.5 — единственная (а значит, самая новая) версия visionOS
+		// visionOS 2.5 is the only (and so the newest) visionOS version
 		if got := whyNot(find(t, items, "EEE")); got != reasonNewestRuntime {
 			t.Errorf("visionOS 2.5 reason = %q, want %q", got, reasonNewestRuntime)
 		}
 	})
 
 	t.Run("runtime with a booted simulator is running", func(t *testing.T) {
-		// iOS 18.4 не самая новая и образ ни с кем не делит — но на ней
-		// запущен iPhone 16, поэтому выбрать её нельзя.
+		// iOS 18.4 is not the newest and shares its image with nobody, but an
+		// iPhone 16 is running on it, so it cannot be selected.
 		if got := whyNot(find(t, items, "DDD")); got != reasonDeviceBooted {
 			t.Errorf("iOS 18.4 reason = %q, want %q", got, reasonDeviceBooted)
 		}
@@ -126,7 +126,7 @@ func TestScanProtectsWhatWeLostOnNov8(t *testing.T) {
 }
 
 func TestDyldCache(t *testing.T) {
-	// Given: кэш dyld для удалённой iOS 18.4
+	// Given: a dyld cache for the removed iOS 18.4
 	p := fakeSimctl(t)
 	dir := filepath.Join(p.dyldRoot, "26A434", "com.apple.CoreSimulator.SimRuntime.iOS-18-4.22E238")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -141,7 +141,7 @@ func TestDyldCache(t *testing.T) {
 	cache := find(t, items, dir)
 	actions, _ := p.Plan([]core.Item{cache})
 
-	// Then: понятное имя и удаление с паролем администратора
+	// Then: a readable name and deletion with the administrator password
 	if cache.Name != "iOS 18.4 (22E238)" {
 		t.Errorf("name = %q", cache.Name)
 	}
@@ -162,7 +162,7 @@ func TestPlanUsesSimctl(t *testing.T) {
 	if !slices.Equal(got, want) {
 		t.Errorf("plan = %v, want %v", got, want)
 	}
-	// И ни одной команды «удалить все недоступные».
+	// And not a single "delete all unavailable" command.
 	for _, a := range actions {
 		if strings.Contains(a.String(), "unavailable") {
 			t.Errorf("plan must never use 'delete unavailable': %s", a)

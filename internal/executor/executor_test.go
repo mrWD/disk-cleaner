@@ -11,8 +11,8 @@ import (
 	"disk-cleaner/internal/core"
 )
 
-// newTestExecutor — исполнитель, у которого «домашняя папка» — временная,
-// а окно пароля администратора заменено записью команды.
+// newTestExecutor is an executor whose "home folder" is a temporary one
+// and whose administrator password prompt is replaced by recording the command.
 func newTestExecutor(t *testing.T) (*Local, *[]string) {
 	t.Helper()
 
@@ -27,8 +27,8 @@ func newTestExecutor(t *testing.T) (*Local, *[]string) {
 			adminCmds = append(adminCmds, cmd)
 			return nil
 		},
-		// Вместо настоящей Корзины — запись в список (и пометка в adminCmds,
-		// чтобы тест видел, что вызвали именно Корзину).
+		// Instead of the real Trash we record to a list (and a mark in adminCmds,
+		// so the test can see that it was the Trash that got called).
 		trash: func(_ context.Context, path string) error {
 			adminCmds = append(adminCmds, "trash "+path)
 			return nil
@@ -38,7 +38,7 @@ func newTestExecutor(t *testing.T) (*Local, *[]string) {
 	return ex, &adminCmds
 }
 
-// mkdir создаёт папку с файлом внутри и возвращает её путь.
+// mkdir creates a folder with a file inside and returns its path.
 func mkdir(t *testing.T, parts ...string) string {
 	t.Helper()
 	dir := filepath.Join(parts...)
@@ -70,7 +70,7 @@ func TestRemove(t *testing.T) {
 		}
 	})
 
-	// Сценарии, где исполнитель обязан отказаться.
+	// Scenarios where the executor must refuse.
 	refusals := []struct {
 		scenario string
 		path     func(home string) string
@@ -108,7 +108,7 @@ func TestRemove(t *testing.T) {
 	})
 
 	t.Run("read-only folders are removed too", func(t *testing.T) {
-		// Given: папка без права записи, как в кэше модулей Go
+		// Given: a folder without write permission, like in the Go module cache
 		ex, _ := newTestExecutor(t)
 		mod := mkdir(t, ex.Home, "go", "pkg", "mod", "example.com@v1")
 		if err := os.Chmod(mod, 0o555); err != nil {
@@ -195,7 +195,7 @@ func TestCommand(t *testing.T) {
 	})
 
 	t.Run("commands with administrator rights are refused", func(t *testing.T) {
-		// С паролем можно только удалять пути внутри AdminRoots — и ничего больше.
+		// With the password you may only delete paths inside AdminRoots, and nothing else.
 		ex, adminCmds := newTestExecutor(t)
 
 		err := ex.Run(ctx, core.Action{Command: []string{"/bin/echo", "a b; c"}, NeedsAdmin: true})

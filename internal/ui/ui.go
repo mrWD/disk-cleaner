@@ -1,22 +1,26 @@
-// Package ui — окно приложения на Fyne, оформленное в духе приложений Apple.
+// Package ui is the application window on Fyne, styled in the spirit of Apple apps.
 //
-// UI знает только core: каждый провайдер для него — просто core.Provider,
-// и показываются они одинаково. Правила (что можно выбрать, что и как
-// удалить) UI не придумывает, а спрашивает у ядра.
+// The UI knows only core: for it every provider is just a core.Provider,
+// and they are all shown the same way. The rules (what can be selected, what to
+// delete and how) are not invented by the UI; it asks the core.
 //
-// Файлы пакета:
+// Files of the package:
 //
-//	ui.go        — создание окна и общая раскладка
-//	theme.go     — тема: цвета macOS, шрифт San Francisco, размеры
-//	widgets.go   — кирпичики оформления: плашки, таблетки, значки, полоса диска
-//	sidebar.go   — боковая панель: диск, «Очистить всё», поиск, разделы, кнопки
-//	disk.go      — плашка диска в боковой панели и кнопка «Очистить всё»
-//	details.go   — правая часть: шапка раздела, категории, строки объектов
-//	search.go    — поиск по всем разделам и по открытому разделу, «Выбрать все»
-//	bottom.go    — нижняя полоса: что выбрано и кнопка очистки
-//	scan.go      — сканирование в фоне
-//	clean.go     — план, подтверждение и выполнение; «Очистить всё»
-//	settings.go  — окно настроек
+//	ui.go          - creating the window and the overall layout
+//	theme.go       - the theme: macOS colours, the San Francisco font, sizes
+//	appearance.go  - the Light / Dark / Auto tiles in Settings
+//	widgets.go     - styling building blocks: cards, pills, icons, the disk bar
+//	sidebar.go     - the sidebar: search and sections on top; the disk card,
+//	                 Rescan and Settings at the bottom
+//	disk.go        - the disk card and the global "Clean All Safe" button
+//	details.go     - the right-hand part: section header, categories, item rows
+//	search.go      - search over all sections and over the open section, "Select All"
+//	bottom.go      - the bottom strip: what is selected, Never Clean, Review & Clean…
+//	scan.go        - scanning in the background
+//	clean.go       - the plan, confirmation and execution; "Clean All Safe"
+//	never.go       - the "Never clean" list
+//	permissions.go - permissions: the first-launch window and the section in Settings
+//	settings.go    - the settings window
 package ui
 
 import (
@@ -37,35 +41,35 @@ import (
 	"disk-cleaner/internal/settings"
 )
 
-// Тексты самого интерфейса (кнопки, заголовки) и причин из core.
+// Texts of the interface itself (buttons, titles) and of the reasons from core.
 //
 //go:embed translations
 var translations embed.FS
 
-// Значок приложения для боковой панели.
+// The app icon for the sidebar.
 //
 //go:embed assets/appicon.png
 var appIcon []byte
 
-// Options — всё, что окну нужно снаружи. Собирается в main.go.
+// Options is everything the window needs from outside. It is assembled in main.go.
 type Options struct {
 	Providers []core.Provider
 	Executor  core.Executor
 	Settings  *settings.Store
 }
 
-// providerState — что известно об одном провайдере.
-// Меняется только в UI-потоке (в обработчиках и внутри fyne.Do),
-// поэтому мьютекс не нужен.
+// providerState is what is known about one provider.
+// It changes only on the UI thread (in handlers and inside fyne.Do),
+// so no mutex is needed.
 type providerState struct {
 	provider core.Provider
 	scanning bool
-	gen      int // номер сканирования: результаты устаревших сканирований отбрасываем
+	gen      int // scan number: results of outdated scans are thrown away
 	items    []core.Item
 	err      error
 }
 
-// App — окно и его состояние.
+// App is the window and its state.
 type App struct {
 	app    fyne.App
 	win    fyne.Window
@@ -75,43 +79,43 @@ type App struct {
 	states []*providerState
 	sel    *core.Selection
 
-	current int // какой раздел выбран слева
+	current int // which section is selected on the left
 
-	// selView — для какого вида (раздел или поиск) сделан текущий выбор.
-	// Сменился вид — отметки снимаются (см. refreshDetails).
+	// selView is the view (a section or a search) the current selection was made for.
+	// When the view changes, the marks are cleared (see refreshDetails).
 	selView string
 
-	// Поиск и вид списка.
-	globalQuery  string          // поиск по всем разделам (поле в боковой панели)
-	sectionQuery string          // поиск в открытом разделе (поле над списком)
-	expanded     map[string]bool // категория → развёрнута ли (по умолчанию — свёрнута)
+	// Search and the list view.
+	globalQuery  string          // search over all sections (the field in the sidebar)
+	sectionQuery string          // search in the open section (the field above the list)
+	expanded     map[string]bool // category -> whether it is expanded (collapsed by default)
 
-	// Части окна, которые перестраиваются при изменениях.
-	banner        *fyne.Container // полоса «Включён пробный режим» над правой частью
-	disk          *fyne.Container // плашка диска в боковой панели
-	cleanEvery    *widget.Button  // «Очистить всё» во всех разделах (в плашке диска)
+	// Parts of the window that are rebuilt on changes.
+	banner        *fyne.Container // the "Dry run is on" strip above the right-hand part
+	disk          *fyne.Container // the disk card in the sidebar
+	cleanEvery    *widget.Button  // "Clean All Safe" for all sections (in the disk card)
 	sidebarRows   *fyne.Container
-	searchEntry   *widget.Entry // поле глобального поиска
+	searchEntry   *widget.Entry // the global search field
 	details       *fyne.Container
-	detailsTop    *fyne.Container   // шапка правой части: заголовок, поиск, «Выбрать все»
-	topKey        string            // для какого вида построена шапка (раздел или поиск)
-	subtitle      *canvas.Text      // подзаголовок в шапке — меняется без перестройки шапки
-	selectAllBtn  *widget.Button    // «Выбрать все / Снять все» для видимых объектов
-	cleanAllBtn   *widget.Button    // «Очистить всё» в открытом разделе (в поиске его нет)
-	list          *fyne.Container   // сюда кладётся список под шапкой
-	detailsScroll *container.Scroll // прокрутка списка (чтобы сохранять позицию)
+	detailsTop    *fyne.Container   // the header of the right-hand part: title, search, "Select All"
+	topKey        string            // which view the header was built for (a section or a search)
+	subtitle      *canvas.Text      // the subtitle in the header; it changes without rebuilding the header
+	selectAllBtn  *widget.Button    // "Select All / Deselect All" for the visible items
+	cleanAllBtn   *widget.Button    // "Clean All Safe" in the open section (there is none in search)
+	list          *fyne.Container   // the list goes here, under the header
+	detailsScroll *container.Scroll // the scroll of the list (to keep the position)
 	bottom        *fyne.Container
 	cleanButton   *widget.Button
 }
 
-// New создаёт окно, загружает тексты и запускает первое сканирование.
+// New creates the window, loads the texts and starts the first scan.
 func New(a fyne.App, opts Options) (*App, error) {
 	tr := i18n.New()
 	if err := tr.Add(translations, "translations"); err != nil {
 		return nil, err
 	}
 	for _, p := range opts.Providers {
-		// У провайдера может не быть своих текстов (так бывает в тестах).
+		// A provider may have no texts of its own (this happens in tests).
 		if err := tr.Add(p.Translations(), "translations"); err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return nil, fmt.Errorf("%s translations: %w", p.ID(), err)
 		}
@@ -130,30 +134,35 @@ func New(a fyne.App, opts Options) (*App, error) {
 	}
 
 	u.app = a
-	u.applyAppearance(opts.Settings.Appearance()) // светлое, тёмное или как в macOS
+	u.applyAppearance(opts.Settings.Appearance()) // light, dark or as in macOS
 
 	u.win = a.NewWindow(u.t("app.title"))
-	u.win.SetPadded(false) // боковая панель — от края до края, как в macOS
+	u.win.SetPadded(false) // the sidebar goes edge to edge, as in macOS
 	u.win.Resize(fyne.NewSize(1180, 780))
 	u.render()
 
-	// ⌘F — перейти в поле поиска, как в любом приложении Mac.
+	// Cmd+F jumps to the search field, as in any Mac app.
 	u.win.Canvas().AddShortcut(
 		&desktop.CustomShortcut{KeyName: fyne.KeyF, Modifier: fyne.KeyModifierShortcutDefault},
 		func(fyne.Shortcut) { u.win.Canvas().Focus(u.searchEntry) },
 	)
 
-	// macOS переключилась между светлым и тёмным видом — перерисовать:
-	// наши плашки и тексты берут цвета в момент создания.
+	// macOS switched between the light and dark look, so redraw:
+	// our cards and texts take their colours at the moment they are created.
 	a.Settings().AddListener(func(fyne.Settings) {
 		fyne.Do(u.render)
 	})
 
-	u.scanAll()
+	// First launch: explain the permissions first; the scan starts after Continue.
+	if opts.Settings.PermissionsAsked() {
+		u.scanAll()
+	} else {
+		u.showIntro()
+	}
 	return u, nil
 }
 
-// Run создаёт окно, показывает его и ждёт, пока его закроют.
+// Run creates the window, shows it and waits until it is closed.
 func Run(a fyne.App, opts Options) error {
 	u, err := New(a, opts)
 	if err != nil {
@@ -163,29 +172,29 @@ func Run(a fyne.App, opts Options) error {
 	return nil
 }
 
-// render строит всё окно заново. Вызывается при запуске, при смене
-// языка, настроек или светлого/тёмного вида. Галочки при этом
-// сохраняются — они живут в u.sel.
+// render rebuilds the whole window. It is called at startup and when the
+// language, the settings or the light/dark look change. The checkmarks
+// are kept, because they live in u.sel.
 func (u *App) render() {
 	u.win.SetTitle(u.t("app.title"))
 
 	u.banner = container.NewVBox()
-	u.details = container.NewStack() // Stack показывает свой объект на всю площадь
+	u.details = container.NewStack() // Stack shows its object over the whole area
 	u.detailsScroll = nil
-	u.topKey = "" // шапку правой части — построить заново (например, на новом языке)
+	u.topKey = "" // rebuild the right-hand header (for example, in a new language)
 	u.bottom = container.NewStack()
 
-	// Справа: полоса пробного режима сверху (если он включён), нижняя
-	// полоса снизу, подробности между ними.
+	// On the right: the dry run strip on top (if it is on), the bottom
+	// strip at the bottom, the details between them.
 	main := edges(u.banner, u.bottom, nil, nil, u.details)
 
-	// Боковая панель слева на всю высоту, как в Finder и Настройках.
+	// The sidebar on the left over the full height, as in Finder and Settings.
 	u.win.SetContent(edges(nil, nil, u.buildSidebar(), nil, main))
 
 	u.refresh()
 }
 
-// refresh обновляет всё, что зависит от состояния провайдеров и выбора.
+// refresh updates everything that depends on the providers' state and on the selection.
 func (u *App) refresh() {
 	u.fillBanner()
 	u.fillDisk()
@@ -195,16 +204,16 @@ func (u *App) refresh() {
 	u.relayout()
 }
 
-// relayout заново раскладывает окно. Верхняя и нижняя полосы меняют высоту
-// (включили пробный режим, выбрали объекты), а родительская раскладка сама
-// об этом не узнаёт — без этого полосы налезали бы на содержимое.
+// relayout lays out the window again. The top and bottom strips change height
+// (dry run was turned on, items were selected), and the parent layout doesn't
+// find out about that on its own; without this the strips would overlap the content.
 func (u *App) relayout() {
 	if c := u.win.Content(); c != nil {
 		c.Refresh()
 	}
 }
 
-// look — значок и цвет раздела. Провайдер без core.Look получает серый.
+// look is the section's icon and colour. A provider without core.Look gets grey.
 func (u *App) look(p core.Provider) ([]byte, color.Color) {
 	if l, ok := p.(core.Look); ok {
 		icon, tint := l.Look()
@@ -213,17 +222,17 @@ func (u *App) look(p core.Provider) ([]byte, color.Color) {
 	return nil, hex("#8E8E93")
 }
 
-// t — короткий способ взять текст на текущем языке.
+// t is a short way to get a text in the current language.
 func (u *App) t(key string, args ...map[string]any) string {
 	return u.tr.T(key, args...)
 }
 
-// reason — текст причины (почему нельзя выбрать или почему недоступно).
+// reason is the text of a reason (why something can't be selected or why it is unavailable).
 func (u *App) reason(r core.Reason) string {
 	return u.tr.T(r.Key, r.Args)
 }
 
-// errText — понятный текст ошибки.
+// errText is a readable error text.
 func (u *App) errText(err error) string {
 	var blocked *core.BlockedError
 	if errors.As(err, &blocked) {
@@ -232,17 +241,17 @@ func (u *App) errText(err error) string {
 	return err.Error()
 }
 
-// wrapLabel — надпись, которая переносит длинный текст по словам.
+// wrapLabel is a label that wraps long text by words.
 func (u *App) wrapLabel(text string) *widget.Label {
 	l := widget.NewLabel(text)
 	l.Wrapping = fyne.TextWrapWord
 	return l
 }
 
-// total — сколько можно освободить: всё найденное, кроме защищённого
-// (данные, которые чистят в самой программе, сюда не входят — здесь их
-// удалить нельзя). Занятое запущенной программой — входит: его можно
-// будет удалить, когда программу закроют.
+// total is how much can be freed: everything found except what is protected
+// (data that is cleaned inside the program itself is not counted; it
+// can't be deleted here). What a running program holds is counted: it can
+// be deleted once the program is closed.
 func total(items []core.Item) core.Bytes {
 	var sum core.Bytes
 	for _, it := range items {
@@ -253,7 +262,7 @@ func total(items []core.Item) core.Bytes {
 	return sum
 }
 
-// totalAll — размер всего найденного, вместе с защищённым.
+// totalAll is the size of everything found, protected data included.
 func totalAll(items []core.Item) core.Bytes {
 	var sum core.Bytes
 	for _, it := range items {

@@ -12,10 +12,10 @@ func TestRun(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("arguments are passed as is, without a shell", func(t *testing.T) {
-		// When: передаём аргумент с ; и $ — в оболочке это были бы спецсимволы
+		// When: we pass an argument with ; and $, which would be special characters in a shell
 		out, err := Run(ctx, "echo", "a; rm -rf $HOME")
 
-		// Then: echo просто напечатал строку, ничего не выполнилось
+		// Then: echo just printed the string, nothing was executed
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -25,10 +25,10 @@ func TestRun(t *testing.T) {
 	})
 
 	t.Run("failed command explains why", func(t *testing.T) {
-		// When: ls несуществующей папки
+		// When: ls on a folder that doesn't exist
 		_, err := Run(ctx, "ls", "/definitely/not/here")
 
-		// Then: в ошибке есть текст из stderr
+		// Then: the error contains the text from stderr
 		if err == nil || !strings.Contains(err.Error(), "No such file") {
 			t.Errorf("err = %v, want stderr in the message", err)
 		}
@@ -44,9 +44,9 @@ func TestRun(t *testing.T) {
 }
 
 func TestEnvHasFullPath(t *testing.T) {
-	// Then: в PATH для запускаемых программ есть папка Homebrew,
-	// даже если приложение запустили из Finder с коротким PATH.
-	t.Setenv("PATH", "/usr/bin:/bin") // как у приложения из Finder
+	// Then: the PATH for the programs we start includes the Homebrew folder,
+	// even if the app was launched from Finder with a short PATH.
+	t.Setenv("PATH", "/usr/bin:/bin") // like an app launched from Finder has
 
 	for _, kv := range Env() {
 		if strings.HasPrefix(kv, "PATH=") && strings.Contains(kv, "/opt/homebrew/bin") {

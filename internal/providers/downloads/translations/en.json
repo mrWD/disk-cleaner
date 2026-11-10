@@ -1,6 +1,7 @@
 {
   "downloads.name": "Downloads",
   "downloads.no_access": "Disk Cleaner can't read Downloads yet. Allow it in System Settings › Privacy & Security › Files and Folders › Disk Cleaner › Downloads Folder, then rescan.",
+  "downloads.turned_off": "Turned off in Settings › Permissions, so Disk Cleaner doesn't look in Downloads.",
   "downloads.mounted": "This disk image is mounted. Eject it in Finder first.",
 
   "downloads.installers.title": "Installers",

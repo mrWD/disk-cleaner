@@ -2,11 +2,11 @@ package core
 
 import "testing"
 
-// Тесты в Go — функции с именем TestXxx в файлах *_test.go.
-// Запускаются командой go test и в собранную программу не попадают.
+// Tests in Go are functions named TestXxx in *_test.go files.
+// They are run by go test and don't end up in the built program.
 func TestBytesString(t *testing.T) {
-	// Таблица случаев: имя поведения, вход, ожидаемый результат.
-	// struct { ... } прямо на месте — анонимная структура, как объект в JS.
+	// A table of cases: behaviour name, input, expected result.
+	// struct { ... } right in place is an anonymous struct, like an object in JS.
 	cases := []struct {
 		name string
 		in   Bytes
@@ -15,19 +15,19 @@ func TestBytesString(t *testing.T) {
 		{"zero", 0, "0 B"},
 		{"less than a kilobyte stays in bytes", 999, "999 B"},
 		{"exactly one kilobyte", 1000, "1.0 kB"},
-		{"megabytes with one decimal", 1_500_000, "1.5 MB"}, // _ в числах — для читаемости
+		{"megabytes with one decimal", 1_500_000, "1.5 MB"}, // _ in numbers is for readability
 		{"typical free space", 104_300_000_000, "104.3 GB"},
 	}
 
-	// range перебирает срез: _ — индекс (не нужен), c — очередной случай.
+	// range walks the slice: _ is the index (not needed), c is the current case.
 	for _, c := range cases {
-		// t.Run — подтест со своим именем. Имена описывают поведение,
-		// как сценарии в BDD, и видны в выводе go test -v.
+		// t.Run is a subtest with its own name. The names describe behaviour,
+		// like scenarios in BDD, and show up in the go test -v output.
 		t.Run(c.name, func(t *testing.T) {
 			got := c.in.String()
 
 			if got != c.want {
-				// %q печатает строку в кавычках — так видны лишние пробелы.
+				// %q prints the string in quotes, so stray spaces are visible.
 				t.Errorf("Bytes(%d).String() = %q, want %q", int64(c.in), got, c.want)
 			}
 		})

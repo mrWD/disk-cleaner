@@ -1,11 +1,11 @@
-// Package models — провайдер локальных AI-моделей: скачанных в LM Studio,
-// Ollama, кэш Hugging Face, модели, которые скачали приложения (например,
-// Lingary или Argos Translate), и хранилище llmstore.
+// Package models is the provider for local AI models: the ones downloaded in LM Studio,
+// Ollama, the Hugging Face cache, models that apps downloaded (for example
+// Lingary or Argos Translate), and the llmstore storage.
 //
-// Модели — самые большие файлы на Mac разработчика: одна модель весит
-// от сотен мегабайт до десятков гигабайт. Удалять их безопасно в том
-// смысле, что их можно скачать снова, но это долго — поэтому риск у всех
-// категорий «Caution».
+// Models are the biggest files on a developer's Mac: one model weighs
+// from hundreds of megabytes to tens of gigabytes. Deleting them is safe in the
+// sense that you can download them again, but that takes long, so all
+// categories have the "Caution" risk.
 package models
 
 import (
@@ -34,23 +34,23 @@ const (
 	catApps        = "models.apps"
 	catLLMStore    = "models.llmstore"
 
-	// Причины, почему модель нельзя выбрать (тексты в translations).
-	reasonLoaded     = "models.loaded"      // модель сейчас загружена в память программы
-	reasonAppRunning = "models.app_running" // приложение, скачавшее модель, запущено
-	reasonLLMStore   = "models.llmstore"    // файлом управляет llmstore
+	// Reasons a model cannot be selected (texts are in translations).
+	reasonLoaded     = "models.loaded"      // the model is loaded into the program's memory right now
+	reasonAppRunning = "models.app_running" // the app that downloaded the model is running
+	reasonLLMStore   = "models.llmstore"    // the file is managed by llmstore
 
-	// minAppModel — меньше этого в папках моделей приложений не показываем:
-	// там лежат служебные файлы вроде state.json.
+	// minAppModel: anything smaller is not shown in the app model folders,
+	// because those hold service files like state.json.
 	minAppModel = core.Bytes(1_000_000)
 )
 
-// Provider ищет модели в домашней папке.
+// Provider looks for models in the home folder.
 type Provider struct {
 	home      string
-	processes func(ctx context.Context) []string // список процессов; в тестах — фейк
+	processes func(ctx context.Context) []string // list of processes; a fake in tests
 }
 
-// New — провайдер для текущего пользователя.
+// New is the provider for the current user.
 func New() *Provider {
 	return &Provider{home: kit.Home(), processes: kit.Processes}
 }
@@ -85,8 +85,8 @@ func (p *Provider) Scan(ctx context.Context) ([]core.Item, error) {
 func (p *Provider) Plan(items []core.Item) ([]core.Action, error) {
 	var actions []core.Action
 
-	// Модели Ollama: манифест и только те блобы, которые не нужны другим
-	// моделям (одинаковые слои у разных моделей хранятся один раз).
+	// Ollama models: the manifest and only those blobs that no other
+	// model needs (identical layers of different models are stored once).
 	ollama := map[string]ollamaModel{}
 	for _, m := range p.ollamaModels() {
 		ollama[m.manifest] = m
@@ -99,7 +99,7 @@ func (p *Provider) Plan(items []core.Item) ([]core.Action, error) {
 		}
 		m, ok := ollama[it.ID]
 		if !ok {
-			continue // модель уже удалили — делать нечего
+			continue // the model is already deleted, nothing to do
 		}
 		actions = append(actions, core.Action{RemovePath: m.manifest})
 		for _, blob := range m.uniqueBlobs {
@@ -112,8 +112,8 @@ func (p *Provider) Plan(items []core.Item) ([]core.Action, error) {
 
 // ---------- LM Studio ----------
 
-// lmStudio — модели LM Studio: <папка загрузок>/<издатель>/<модель>.
-// Папку загрузок можно поменять в настройках LM Studio — читаем её оттуда.
+// lmStudio is LM Studio models: <downloads folder>/<publisher>/<model>.
+// The downloads folder can be changed in LM Studio settings, so we read it from there.
 func (p *Provider) lmStudio(ctx context.Context) []core.Item {
 	dir := filepath.Join(p.home, ".lmstudio", "models")
 
@@ -139,25 +139,25 @@ func (p *Provider) lmStudio(ctx context.Context) []core.Item {
 
 // ---------- Ollama ----------
 
-// ollamaModel — одна модель Ollama.
+// ollamaModel is one Ollama model.
 type ollamaModel struct {
 	name        string   // "qwen2.5:0.5b"
-	manifest    string   // путь к файлу-манифесту
-	modelBlob   string   // путь к файлу с весами (по нему видно, загружена ли модель)
-	uniqueBlobs []string // блобы, которые есть только у этой модели
+	manifest    string   // path to the manifest file
+	modelBlob   string   // path to the weights file (it shows whether the model is loaded)
+	uniqueBlobs []string // blobs that only this model has
 	size        core.Bytes
 }
 
-// ollamaLayer — слой из манифеста Ollama.
+// ollamaLayer is a layer from an Ollama manifest.
 type ollamaLayer struct {
 	Digest    string `json:"digest"` // "sha256:74a4…"
 	MediaType string `json:"mediaType"`
 	Size      int64  `json:"size"`
 }
 
-// ollamaModels читает манифесты Ollama: каждая модель — файл
-// manifests/<реестр>/<пространство>/<модель>/<тег> со списком слоёв.
-// Слои лежат в blobs/sha256-<хэш>, и разные модели могут делить один слой.
+// ollamaModels reads Ollama manifests: each model is a file
+// manifests/<registry>/<namespace>/<model>/<tag> with a list of layers.
+// Layers are in blobs/sha256-<hash>, and different models can share one layer.
 func (p *Provider) ollamaModels() []ollamaModel {
 	root := filepath.Join(p.home, ".ollama", "models")
 	manifests := filepath.Join(root, "manifests")
@@ -171,7 +171,7 @@ func (p *Provider) ollamaModels() []ollamaModel {
 		layers []ollamaLayer
 	}
 	var all []parsed
-	refs := map[string]int{} // хэш слоя → сколько моделей его используют
+	refs := map[string]int{} // layer hash → how many models use it
 
 	_ = filepath.WalkDir(manifests, func(path string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
@@ -205,7 +205,7 @@ func (p *Provider) ollamaModels() []ollamaModel {
 			if l.MediaType == "application/vnd.ollama.image.model" {
 				om.modelBlob = blobPath(l.Digest)
 			}
-			if refs[l.Digest] == 1 { // слой только у этой модели — его можно удалить
+			if refs[l.Digest] == 1 { // the layer is only in this model, so it can be deleted
 				if _, err := os.Stat(blobPath(l.Digest)); err == nil {
 					om.uniqueBlobs = append(om.uniqueBlobs, blobPath(l.Digest))
 					om.size += core.Bytes(l.Size)
@@ -218,7 +218,7 @@ func (p *Provider) ollamaModels() []ollamaModel {
 }
 
 // ollamaName: "registry.ollama.ai/library/qwen2.5/0.5b" → "qwen2.5:0.5b",
-// модели из других реестров — с адресом: "hf.co/bartowski/model:Q4_K_M".
+// models from other registries keep the address: "hf.co/bartowski/model:Q4_K_M".
 func ollamaName(rel string) string {
 	parts := strings.Split(filepath.ToSlash(rel), "/")
 	if len(parts) < 2 {
@@ -229,7 +229,7 @@ func ollamaName(rel string) string {
 	return model + ":" + tag
 }
 
-// ollamaItems — объекты для моделей Ollama.
+// ollamaItems builds the items for Ollama models.
 func (p *Provider) ollamaItems(processes []string) []core.Item {
 	var items []core.Item
 	for _, m := range p.ollamaModels() {
@@ -240,7 +240,7 @@ func (p *Provider) ollamaItems(processes []string) []core.Item {
 			Detail:     kit.Tilde(filepath.Join(p.home, ".ollama", "models")),
 			Size:       m.size,
 		}
-		// Загруженную модель держит процесс «ollama runner --model <блоб>».
+		// A loaded model is held by the process "ollama runner --model <blob>".
 		if m.modelBlob != "" && kit.AnyProcess(processes, m.modelBlob) {
 			it.Status = core.StatusInUse
 			it.Busy = &core.Reason{Key: reasonLoaded, Args: map[string]any{"App": "Ollama"}}
@@ -252,8 +252,8 @@ func (p *Provider) ollamaItems(processes []string) []core.Item {
 
 // ---------- Hugging Face ----------
 
-// huggingFace — кэш библиотек Hugging Face (transformers,
-// sentence-transformers, diffusers): hub/models--<организация>--<модель>.
+// huggingFace is the cache of Hugging Face libraries (transformers,
+// sentence-transformers, diffusers): hub/models--<organization>--<model>.
 func (p *Provider) huggingFace(ctx context.Context) []core.Item {
 	hub := filepath.Join(p.home, ".cache", "huggingface", "hub")
 
@@ -277,25 +277,25 @@ func (p *Provider) huggingFace(ctx context.Context) []core.Item {
 	})
 }
 
-// ---------- Модели приложений ----------
+// ---------- App models ----------
 
-// appModelDir — папка с моделями, которую создало приложение.
+// appModelDir is a folder with models that an app created.
 type appModelDir struct {
 	app string // "Lingary"
 	dir string
 }
 
-// skipAppSupport — папки в Application Support, куда не заглядываем:
-// данные Claude, системные папки Apple (часть из них macOS закрывает).
+// skipAppSupport: folders in Application Support that we do not look into:
+// Claude data and Apple system folders (macOS locks some of them).
 var skipAppSupport = map[string]bool{
 	"Claude": true, "AddressBook": true, "CallHistoryDB": true, "CallHistoryTransactions": true,
 	"FaceTime": true, "Knowledge": true, "MobileSync": true, "CloudDocs": true,
 }
 
-// appModelDirs ищет, куда приложения складывают модели:
-//   - ~/Library/Application Support/<App>/…/models (не глубже трёх уровней);
-//   - ~/.local/share/argos-translate/packages — модели перевода Argos;
-//   - ~/.cache/<имя с «model»> — кэши моделей своих программ.
+// appModelDirs finds where apps put models:
+//   - ~/Library/Application Support/<App>/…/models (no deeper than three levels);
+//   - ~/.local/share/argos-translate/packages: Argos translation models;
+//   - ~/.cache/<name with "model">: model caches of individual programs.
 func (p *Provider) appModelDirs() []appModelDir {
 	var out []appModelDir
 
@@ -324,8 +324,8 @@ func (p *Provider) appModelDirs() []appModelDir {
 	return out
 }
 
-// findModelsDirs — папки с именем models внутри root, не глубже depth.
-// Найденную папку не обходим дальше.
+// findModelsDirs finds folders named models inside root, no deeper than depth.
+// We do not go further into a folder we found.
 func findModelsDirs(root string, depth int) []string {
 	if depth == 0 {
 		return nil
@@ -333,7 +333,7 @@ func findModelsDirs(root string, depth int) []string {
 
 	var out []string
 	for _, dir := range kit.Subfolders(root) {
-		if strings.EqualFold(filepath.Base(dir), "models") { // без учёта регистра
+		if strings.EqualFold(filepath.Base(dir), "models") { // case-insensitive
 			out = append(out, dir)
 			continue
 		}
@@ -342,8 +342,8 @@ func findModelsDirs(root string, depth int) []string {
 	return out
 }
 
-// appModels — по объекту на каждую модель (папку или файл) в папках
-// моделей приложений.
+// appModels gives one item per model (folder or file) in the app
+// model folders.
 func (p *Provider) appModels(ctx context.Context, processes []string) []core.Item {
 	var items []core.Item
 
@@ -355,7 +355,7 @@ func (p *Provider) appModels(ctx context.Context, processes []string) []core.Ite
 
 		var paths []string
 		for _, e := range entries {
-			if !strings.HasPrefix(e.Name(), ".") { // .partial и прочие служебные — мимо
+			if !strings.HasPrefix(e.Name(), ".") { // .partial and other service files are skipped
 				paths = append(paths, filepath.Join(d.dir, e.Name()))
 			}
 		}
@@ -375,7 +375,7 @@ func (p *Provider) appModels(ctx context.Context, processes []string) []core.Ite
 				Size:       sizes[i],
 			}
 			if running {
-				// Работающее приложение может держать модель открытой.
+				// A running app may hold a model open.
 				it.Status = core.StatusInUse
 				it.Busy = &core.Reason{Key: reasonAppRunning, Args: map[string]any{"App": d.app}}
 			}
@@ -383,12 +383,12 @@ func (p *Provider) appModels(ctx context.Context, processes []string) []core.Ite
 		}
 	}
 
-	slices.SortFunc(items, func(a, b core.Item) int { return cmp.Compare(b.Size, a.Size) }) // большие сверху
+	slices.SortFunc(items, func(a, b core.Item) int { return cmp.Compare(b.Size, a.Size) }) // the big ones on top
 	return items
 }
 
-// leafName — понятное имя: если в папке ровно один элемент, спускаемся
-// к нему, чтобы было видно сам файл модели: "gguf/Qwen3-8B-Q4_K_M.gguf".
+// leafName is a readable name: if a folder has exactly one entry, we step
+// into it, so that the model file itself is visible: "gguf/Qwen3-8B-Q4_K_M.gguf".
 func leafName(path string) string {
 	name := filepath.Base(path)
 	for range 3 {
@@ -404,13 +404,13 @@ func leafName(path string) string {
 
 // ---------- llmstore ----------
 
-// llmStore — модели в хранилище llmstore (~/Library/Models).
+// llmStore is the models in the llmstore storage (~/Library/Models).
 //
-// llmstore хранит одну копию весов, а LM Studio, Ollama и приложения
-// получают её клоны APFS: файлы выглядят отдельными, но блоки на диске
-// общие. Удаление файла в хранилище почти ничего не освобождает, пока
-// живы клоны, — поэтому показываем модели, но защищаем: удалять их
-// нужно через сам llmstore.
+// llmstore keeps one copy of the weights, and LM Studio, Ollama and apps
+// get APFS clones of it: the files look separate, but the blocks on disk
+// are shared. Deleting a file in the storage frees almost nothing while
+// the clones are alive, so we show the models but protect them: they have
+// to be deleted through llmstore itself.
 func (p *Provider) llmStore() []core.Item {
 	root := filepath.Join(p.home, "Library", "Models")
 

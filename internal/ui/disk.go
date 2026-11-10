@@ -10,12 +10,12 @@ import (
 	"disk-cleaner/internal/diskutil"
 )
 
-// fillDisk строит плашку диска в боковой панели: имя диска, сколько
-// свободно, полоса как в «Хранилище» macOS и под ней кнопка «Очистить всё».
+// fillDisk builds the disk card in the sidebar: the disk name, how much
+// is free, a bar like macOS "Storage", and under it the "Clean All Safe" button.
 //
-// Подписей с разделами под полосой нет: сколько нашёл каждый раздел,
-// и так написано справа от его имени в списке ниже, а цвет отрезка
-// на полосе совпадает с цветом значка раздела.
+// There are no per-section labels under the bar: how much each section found
+// is already written to the right of its name in the list below, and the colour of a segment
+// on the bar matches the colour of the section's icon.
 func (u *App) fillDisk() {
 	if u.disk == nil {
 		return
@@ -43,9 +43,9 @@ func (u *App) fillDisk() {
 	u.disk.Refresh()
 }
 
-// diskBar — полоса заполнения диска. Порядок отрезков как в macOS:
-// сначала «прочее» (серое), потом найденное по разделам (их цветами),
-// в конце свободное место.
+// diskBar is the disk fill bar. The order of segments is as in macOS:
+// first "other" (grey), then what was found per section (in their colours),
+// and free space at the end.
 func (u *App) diskBar(free, size core.Bytes) fyne.CanvasObject {
 	used := float64(size - free)
 
@@ -67,10 +67,11 @@ func (u *App) diskBar(free, size core.Bytes) fyne.CanvasObject {
 	return storageBar(all)
 }
 
-// cleanEverywhere — кнопка «Очистить всё» для всех разделов и подпись
-// под ней: сколько это освободит. Входит только безопасное (Safe), см. safeItems.
-// Пока хоть один раздел сканируется, кнопка недоступна: иначе в план
-// не попало бы то, что ещё не нашлось, а подпись обещала бы меньше.
+// cleanEverywhere — the "Clean All Safe (4.4 GB)" button for every section.
+// The label itself says what it covers and how much it frees, so no caption
+// is needed. Only Safe items are included, see safeItems. While any section
+// is still scanning the button is off: the plan would miss what hasn't been
+// found yet, and the label would promise less than there is.
 func (u *App) cleanEverywhere() fyne.CanvasObject {
 	var size core.Bytes
 	var count int
@@ -83,23 +84,20 @@ func (u *App) cleanEverywhere() fyne.CanvasObject {
 		}
 	}
 
-	u.cleanEvery = widget.NewButtonWithIcon(u.t("button.clean_all"), theme.DeleteIcon(), func() { u.cleanAll(u.states...) })
-
-	caption := u.t("clean_all.caption", map[string]any{"Size": size.String()})
-	switch {
-	case scanning:
-		u.cleanEvery.Disable()
-		caption = u.t("clean_all.scanning")
-	case count == 0:
-		u.cleanEvery.Disable()
-		caption = u.t("clean_all.nothing")
+	label := u.t("button.clean_safe", map[string]any{"Size": size.String()})
+	if scanning {
+		label = u.t("button.clean_safe.scanning")
 	}
 
-	return container.NewVBox(u.cleanEvery, container.NewCenter(text(caption, sizeCaption, colorSecondary, false)))
+	u.cleanEvery = widget.NewButtonWithIcon(label, theme.DeleteIcon(), func() { u.cleanAll(u.states...) })
+	if scanning || count == 0 {
+		u.cleanEvery.Disable()
+	}
+	return u.cleanEvery
 }
 
-// fillBanner — полоса над правой частью, когда включён пробный режим:
-// так видно, что кнопки очистки сейчас ничего не удалят.
+// fillBanner is the strip above the right-hand part when dry run is on:
+// it shows that the clean buttons will not delete anything right now.
 func (u *App) fillBanner() {
 	if u.banner == nil {
 		return

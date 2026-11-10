@@ -1,13 +1,13 @@
-// Package downloads — провайдер папки «Загрузки»: установщики (.dmg, .pkg),
-// сборки приложений (.aab, .apk, .ipa, .xcarchive, .app) и архивы
+// Package downloads is the provider for the Downloads folder: installers (.dmg, .pkg),
+// app builds (.aab, .apk, .ipa, .xcarchive, .app) and archives
 // (.zip, .xip, .tar.gz…).
 //
-// Это файлы пользователя, поэтому правила строже, чем у кэшей:
-//   - ничего не удаляется навсегда — файлы переносятся в Корзину, и любую
-//     ошибку можно исправить, вернув файл;
-//   - смонтированный образ диска (.dmg, открытый в Finder) выбрать нельзя;
-//   - чтобы читать «Загрузки», macOS один раз спросит разрешение. Если его
-//     не дать, раздел спокойно скажет, где это разрешить.
+// These are the user's files, so the rules are stricter than for caches:
+//   - nothing is deleted for good: files are moved to the Trash, and any
+//     mistake can be fixed by putting the file back;
+//   - a mounted disk image (a .dmg open in Finder) cannot be selected;
+//   - to read Downloads, macOS asks for permission once. If it is
+//     not given, the section calmly says where to allow it.
 package downloads
 
 import (
@@ -35,14 +35,15 @@ const (
 	catBuilds     = "downloads.builds"
 	catArchives   = "downloads.archives"
 
-	reasonNoAccess = "downloads.no_access" // macOS не дала доступ к «Загрузкам»
-	reasonMounted  = "downloads.mounted"   // образ диска сейчас подключён
+	reasonNoAccess  = "downloads.no_access"  // macOS did not give access to Downloads
+	reasonTurnedOff = "downloads.turned_off" // switched off in Settings › Permissions
+	reasonMounted   = "downloads.mounted"    // the disk image is mounted now
 
-	minSize = core.Bytes(1_000_000) // мелочь не показываем
+	minSize = core.Bytes(1_000_000) // we do not show small stuff
 )
 
-// kinds — какие окончания имён в какую категорию попадают.
-// Для архивов важно проверять составные окончания (.tar.gz) раньше простых.
+// kinds are which name endings go into which category.
+// For archives, compound endings (.tar.gz) must be checked before simple ones.
 var kinds = []struct {
 	category string
 	exts     []string
@@ -52,15 +53,18 @@ var kinds = []struct {
 	{catArchives, []string{".tar.gz", ".tar.xz", ".tar.bz2", ".zip", ".xip", ".tgz", ".tar", ".gz", ".7z", ".rar"}},
 }
 
-// Provider ищет файлы в «Загрузках».
+// Provider looks for files in Downloads.
 type Provider struct {
-	dir string       // папка «Загрузки»
-	run shell.Runner // запуск hdiutil; в тестах — фейк
+	dir     string       // the Downloads folder
+	run     shell.Runner // runs hdiutil; a fake in tests
+	enabled func() bool  // the switch in Settings › Permissions; nil means on
 }
 
-// New — провайдер для «Загрузок» текущего пользователя.
-func New() *Provider {
-	return &Provider{dir: filepath.Join(kit.Home(), "Downloads"), run: shell.Run}
+// New is the provider for the current user's Downloads. enabled is asked
+// before every scan: when it says no, Downloads isn't even opened, so macOS
+// doesn't ask for access either.
+func New(enabled func() bool) *Provider {
+	return &Provider{dir: filepath.Join(kit.Home(), "Downloads"), run: shell.Run, enabled: enabled}
 }
 
 func (p *Provider) ID() string { return "downloads" }
@@ -69,16 +73,20 @@ func (p *Provider) Translations() embed.FS { return translations }
 
 func (p *Provider) Categories() []core.Category {
 	return []core.Category{
-		{ID: catInstallers, Risk: core.RiskSafe},  // программа уже установлена или скачивается снова
-		{ID: catBuilds, Risk: core.RiskCaution},   // сборку могут ещё не загрузить в магазин
-		{ID: catArchives, Risk: core.RiskCaution}, // внутри может быть что-то единственное
+		{ID: catInstallers, Risk: core.RiskSafe},  // the app is already installed or can be downloaded again
+		{ID: catBuilds, Risk: core.RiskCaution},   // the build may not be uploaded to the store yet
+		{ID: catArchives, Risk: core.RiskCaution}, // there may be something unique inside
 	}
 }
 
 func (p *Provider) Scan(ctx context.Context) ([]core.Item, error) {
+	if p.enabled != nil && !p.enabled() {
+		return nil, core.Unavailable(reasonTurnedOff)
+	}
+
 	entries, err := os.ReadDir(p.dir)
 	if errors.Is(err, fs.ErrPermission) {
-		// macOS не дала доступ: это не сбой, а вопрос разрешения.
+		// macOS did not give access: this is not a failure but a question of permission.
 		return nil, core.Unavailable(reasonNoAccess)
 	}
 	if err != nil {
@@ -94,7 +102,7 @@ func (p *Provider) Scan(ctx context.Context) ([]core.Item, error) {
 		if cat == "" || strings.HasPrefix(e.Name(), ".") {
 			continue
 		}
-		// Папкой бывают только сборки .app и .xcarchive; папка «my.zip» — не архив.
+		// Only .app and .xcarchive builds can be folders; a folder "my.zip" is not an archive.
 		if e.IsDir() && cat != catBuilds {
 			continue
 		}
@@ -102,7 +110,7 @@ func (p *Provider) Scan(ctx context.Context) ([]core.Item, error) {
 		path := filepath.Join(p.dir, e.Name())
 		it := core.Item{ID: path, CategoryID: cat, Name: e.Name()}
 		if info, err := e.Info(); err == nil {
-			it.Detail = info.ModTime().Format("2006-01-02") // когда скачан или изменён
+			it.Detail = info.ModTime().Format("2006-01-02") // when it was downloaded or modified
 		}
 		if mounted[path] {
 			it.Status = core.StatusInUse
@@ -122,7 +130,7 @@ func (p *Provider) Scan(ctx context.Context) ([]core.Item, error) {
 	return items, nil
 }
 
-// Plan — в Корзину, а не навсегда.
+// Plan: to the Trash, not for good.
 func (p *Provider) Plan(items []core.Item) ([]core.Action, error) {
 	actions := make([]core.Action, 0, len(items))
 	for _, it := range items {
@@ -131,7 +139,7 @@ func (p *Provider) Plan(items []core.Item) ([]core.Action, error) {
 	return actions, nil
 }
 
-// categoryOf — категория по окончанию имени ("" — не наш файл).
+// categoryOf is the category by name ending ("" means not our file).
 func categoryOf(name string) string {
 	lower := strings.ToLower(name)
 	for _, k := range kinds {
@@ -144,8 +152,8 @@ func categoryOf(name string) string {
 	return ""
 }
 
-// mountedImages — какие образы дисков сейчас подключены. hdiutil info
-// печатает для каждого строку "image-path : /Users/…/file.dmg".
+// mountedImages are the disk images that are mounted right now. hdiutil info
+// prints a line "image-path : /Users/…/file.dmg" for each one.
 func (p *Provider) mountedImages(ctx context.Context) map[string]bool {
 	out, err := p.run(ctx, "/usr/bin/hdiutil", "info")
 	if err != nil {

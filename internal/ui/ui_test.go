@@ -21,18 +21,18 @@ import (
 	"disk-cleaner/internal/settings"
 )
 
-// keyRe находит в коде строки, похожие на ключи переводов: "button.rescan".
-// Пути импорта ("fyne.io/fyne/v2") не подходят: в них есть / и -.
+// keyRe finds strings in the code that look like translation keys: "button.rescan".
+// Import paths ("fyne.io/fyne/v2") don't match: they contain / and -.
 var keyRe = regexp.MustCompile(`"([a-z][a-z_]*(?:\.[a-z_]+)+)"`)
 
-// pluralRe находит ключи, у которых есть форма для единицы: plural("ключ", n).
+// pluralRe finds keys that have a form for the singular: plural("key", n).
 var pluralRe = regexp.MustCompile(`plural\("([a-z_.]+)"`)
 
-// notTextKey — имена файлов, которые keyRe тоже находит.
-var notTextKey = regexp.MustCompile(`\.(svg|png|json|otf|ttf)$`)
+// notTextKey matches file names, which keyRe also finds.
+var notTextKey = regexp.MustCompile(`\.(svg|png|json|otf|ttf|io|com)$`) // files and domains (mrwd.github.io)
 
-// TestEveryKeyIsTranslated — каждый ключ, который встречается в коде UI,
-// есть во всех языках. Ловит опечатки вроде "core.reasong.in_use".
+// TestEveryKeyIsTranslated checks that every key found in the UI code
+// exists in all languages. It catches typos like "core.reasong.in_use".
 func TestEveryKeyIsTranslated(t *testing.T) {
 	catalog := i18n.NewWithSystem(nil)
 	if err := catalog.Add(translations, "translations"); err != nil {
@@ -49,14 +49,14 @@ func TestEveryKeyIsTranslated(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		// Для plural("ключ", n) нужен ещё и вариант "ключ.one".
+		// For plural("key", n) the variant "key.one" is needed as well.
 		for _, m := range pluralRe.FindAllStringSubmatch(string(src), -1) {
 			keys = append(keys, m[1]+".one")
 		}
 		for _, m := range keyRe.FindAllStringSubmatch(string(src), -1) {
 			key := m[1]
-			// Не ключи перевода: свои имена цветов и размеров темы ("dc.card")
-			// и имена файлов ("icon.svg").
+			// Not translation keys: our own theme colour and size names ("dc.card")
+			// and file names ("icon.svg").
 			if strings.HasPrefix(key, "dc.") || notTextKey.MatchString(key) {
 				continue
 			}
@@ -78,9 +78,9 @@ func TestEveryKeyIsTranslated(t *testing.T) {
 	}
 }
 
-// fakeProvider — провайдер для проверки окна. Его сканирование в фоне
-// никогда не заканчивается: результат тест подставляет сам (loaded),
-// чтобы фоновые горутины не мешали проверкам.
+// fakeProvider is a provider for testing the window. Its background scan
+// never finishes: the test supplies the result itself (loaded),
+// so that background goroutines don't disturb the checks.
 type fakeProvider struct {
 	id    string
 	items []core.Item
@@ -91,18 +91,24 @@ func (f fakeProvider) Categories() []core.Category {
 	return []core.Category{{ID: f.id + ".cache", Risk: core.RiskSafe}, {ID: f.id + ".empty", Risk: core.RiskCaution}}
 }
 func (fakeProvider) Scan(ctx context.Context) ([]core.Item, error) {
-	<-ctx.Done() // ждать вечно: контекст фоновый и не отменяется
+	<-ctx.Done() // wait forever: the context is a background one and is never cancelled
 	return nil, ctx.Err()
 }
+
+// Plan: one removal per item; items whose ID starts with "admin" need the password.
 func (fakeProvider) Plan(items []core.Item) ([]core.Action, error) {
-	return []core.Action{{RemovePath: "/tmp/x"}}, nil
+	var out []core.Action
+	for _, it := range items {
+		out = append(out, core.Action{RemovePath: "/tmp/" + it.ID, NeedsAdmin: strings.HasPrefix(it.ID, "admin")})
+	}
+	return out, nil
 }
 func (fakeProvider) Translations() embed.FS { return embed.FS{} }
 
-// texts собирает все тексты, видимые в дереве виджетов.
+// texts collects all the texts visible in the widget tree.
 func texts(obj fyne.CanvasObject) []string {
 	var out []string
-	switch o := obj.(type) { // switch по типу значения
+	switch o := obj.(type) { // a switch on the type of the value
 	case *widget.Label:
 		out = append(out, o.Text)
 	case *canvas.Text:
@@ -125,7 +131,7 @@ func texts(obj fyne.CanvasObject) []string {
 	return out
 }
 
-// Объекты для сценариев: два раздела, «xcode» и «docker».
+// Objects for the scenarios: two sections, "xcode" and "docker".
 var (
 	derived  = core.Item{ID: "d1", CategoryID: "xcode.cache", Name: "Lingary", Detail: "~/Library/Developer/Xcode/DerivedData/Lingary-abc", Size: 2_000_000}
 	archive  = core.Item{ID: "d2", CategoryID: "xcode.cache", Name: "SpesaPlan 1.0.0", Detail: "~/Library/Developer/Xcode/Archives/SpesaPlan", Size: 1_000_000}
@@ -133,13 +139,14 @@ var (
 	postgres = core.Item{ID: "c2", CategoryID: "docker.cache", Name: "postgres:17", Detail: "Lingary database", Size: 3_000_000}
 )
 
-// loaded — окно с двумя разделами, у которых уже есть результаты сканирования.
+// loaded is a window with two sections that already have scan results.
 func loaded(t *testing.T) *App {
 	t.Helper()
 
-	a := test.NewTempApp(t) // приложение без настоящего экрана — для тестов
+	a := test.NewTempApp(t) // an app without a real screen, for tests
 	store := settings.New(a.Preferences(), t.TempDir())
 	store.SetLanguage("en")
+	store.SetPermissionsAsked(true) // not the first launch: no permissions window
 
 	u, err := New(a, Options{
 		Providers: []core.Provider{
@@ -160,7 +167,7 @@ func loaded(t *testing.T) *App {
 	return u
 }
 
-// shown — все тексты правой части одной строкой.
+// shown is all the texts of the right-hand part as one string.
 func shown(u *App) string {
 	return strings.Join(texts(u.details), "\n")
 }
@@ -187,25 +194,25 @@ func mustNotShow(t *testing.T, u *App, unwanted ...string) {
 
 func TestCompactView(t *testing.T) {
 	t.Run("by default each item is one line with name, path, short status and size", func(t *testing.T) {
-		// Given: открыт раздел docker
+		// Given: the docker section is open
 		u := loaded(t)
 		u.selectProvider(1)
 
-		// Then: имя, путь, короткая метка и размер видны; длинных объяснений нет
+		// Then: the name, path, short label and size are visible; there are no long explanations
 		mustShow(t, u, "redis · redis:8", "Running", "1.0 kB", "postgres:17", "Lingary database", "2 items")
 		mustNotShow(t, u, "What it is.", "Running right now.")
 	})
 
 	t.Run("expanding a category shows the explanation and the full reason", func(t *testing.T) {
-		// Given: открыт раздел docker
+		// Given: the docker section is open
 		u := loaded(t)
 		u.selectProvider(1)
 
-		// When: раскрываем категорию
+		// When: we expand the category
 		u.expanded["docker.cache"] = true
 		u.refreshDetails()
 
-		// Then: видны объяснения и полная причина блокировки
+		// Then: the explanations and the full reason for the block are visible
 		mustShow(t, u, "What it is.", "Why it’s safe.", "After cleaning.", "Running right now.")
 	})
 
@@ -219,13 +226,13 @@ func TestCompactView(t *testing.T) {
 
 func TestSectionSearch(t *testing.T) {
 	t.Run("search in a section keeps only matching items", func(t *testing.T) {
-		// Given: открыт раздел xcode
+		// Given: the xcode section is open
 		u := loaded(t)
 
-		// When: ищем по пути
+		// When: we search by path
 		u.setSectionQuery("archives")
 
-		// Then: остался только архив
+		// Then: only the archive is left
 		mustShow(t, u, "SpesaPlan 1.0.0")
 		mustNotShow(t, u, "Lingary")
 	})
@@ -257,10 +264,10 @@ func TestGlobalSearch(t *testing.T) {
 	t.Run("global search finds items in every section", func(t *testing.T) {
 		u := loaded(t)
 
-		// When: ищем слово, которое есть и в Xcode, и в Docker
+		// When: we search for a word that is in both Xcode and Docker
 		u.setGlobalQuery("lingary")
 
-		// Then: результаты из обоих разделов, с заголовками разделов
+		// Then: results from both sections, with section headers
 		mustShow(t, u, "Lingary", "postgres:17", "xcode.name", "docker.name", "2 matches")
 		mustNotShow(t, u, "SpesaPlan", "redis")
 	})
@@ -279,14 +286,14 @@ func TestGlobalSearch(t *testing.T) {
 
 func TestSelectAll(t *testing.T) {
 	t.Run("select all picks only visible items that can be selected", func(t *testing.T) {
-		// Given: глобальный поиск показывает postgres и Lingary, а redis запущен
+		// Given: global search shows postgres and Lingary, and redis is running
 		u := loaded(t)
 		u.setGlobalQuery("lingary")
 
-		// When: «Выбрать все»
+		// When: "Select All"
 		u.toggleVisibleSelection()
 
-		// Then: выбраны оба найденных, но не архив (его не видно) и не redis
+		// Then: both found items are selected, but not the archive (it isn't visible) and not redis
 		if !u.sel.Contains(postgres) || !u.sel.Contains(derived) || u.sel.Contains(archive) || u.sel.Contains(redis) {
 			t.Errorf("selection = %v", u.sel.Items())
 		}
@@ -319,33 +326,33 @@ func TestSelectAll(t *testing.T) {
 
 func TestAppearance(t *testing.T) {
 	t.Run("dark appearance chosen in settings wins over light macOS", func(t *testing.T) {
-		// Given: macOS в светлом виде (тестовое приложение — светлое)
+		// Given: macOS in the light look (the test app is light)
 		u := loaded(t)
 
-		// When: выбираем тёмное оформление
+		// When: we choose the dark appearance
 		u.applyAppearance(appearanceDark)
 
-		// Then: тема отдаёт тёмные цвета даже на вопрос о светлом виде
+		// Then: the theme returns dark colours even when asked about the light look
 		if got := u.theme.Color(theme.ColorNameBackground, theme.VariantLight); got != darkPalette.background {
 			t.Errorf("background = %v, want dark %v", got, darkPalette.background)
 		}
 	})
 
 	t.Run("settings offer three options and remember the choice", func(t *testing.T) {
-		// Given: сохранено «Авто»
+		// Given: "Auto" is saved
 		u := loaded(t)
 		picker := u.newAppearancePicker(appearanceSystem)
 
-		// Then: три плитки — Светлое, Тёмное, Авто
+		// Then: three tiles: Light, Dark, Auto
 		if got := strings.Join(texts(picker.box), ","); got != "Light,Dark,Auto" {
 			t.Errorf("tiles = %q, want Light,Dark,Auto", got)
 		}
 
-		// When: выбираем «Тёмное» и сохраняем
+		// When: we choose "Dark" and save
 		picker.pick(appearanceDark)
 		u.setAppearance(picker.selected)
 
-		// Then: тёмный вид включён и запомнен
+		// Then: the dark look is on and remembered
 		if !u.isDark() || u.opts.Settings.Appearance() != appearanceDark {
 			t.Errorf("dark = %v, saved = %q", u.isDark(), u.opts.Settings.Appearance())
 		}
@@ -362,15 +369,15 @@ func TestAppearance(t *testing.T) {
 
 func TestSwitchingViewClearsSelection(t *testing.T) {
 	t.Run("opening another section clears the checkboxes", func(t *testing.T) {
-		// Given: в разделе xcode отмечен Lingary
+		// Given: Lingary is checked in the xcode section
 		u := loaded(t)
 		_ = u.sel.Add(derived)
 		u.updateBottom()
 
-		// When: открыли раздел docker
+		// When: we open the docker section
 		u.selectProvider(1)
 
-		// Then: ничего не выбрано, и нижняя полоса это показывает
+		// Then: nothing is selected, and the bottom strip shows it
 		if u.sel.Len() != 0 {
 			t.Errorf("selection = %v, want empty after switching sections", u.sel.Items())
 		}
@@ -391,19 +398,19 @@ func TestSwitchingViewClearsSelection(t *testing.T) {
 	})
 
 	t.Run("staying in the section keeps them", func(t *testing.T) {
-		// Given: отмечен Lingary
+		// Given: Lingary is checked
 		u := loaded(t)
 		_ = u.sel.Add(derived)
 
-		// When: раскрыли категорию, сменили оформление (окно перестроилось)
-		// и ещё раз открыли тот же раздел
+		// When: we expanded the category, changed the appearance (the window was rebuilt)
+		// and opened the same section again
 		u.expanded["xcode.cache"] = true
 		u.refreshDetails()
 		u.setAppearance(appearanceDark)
 		u.render()
 		u.selectProvider(0)
 
-		// Then: отметка на месте
+		// Then: the mark is still there
 		if !u.sel.Contains(derived) {
 			t.Errorf("selection = %v, want Lingary kept", u.sel.Items())
 		}
@@ -411,7 +418,7 @@ func TestSwitchingViewClearsSelection(t *testing.T) {
 }
 
 func TestCleanAll(t *testing.T) {
-	// withCaution — тот же набор плюс объект в категории «Осторожно».
+	// withCaution is the same set plus an item in the "Caution" category.
 	emulator := core.Item{ID: "e1", CategoryID: "xcode.empty", Name: "Old emulator", Size: 5_000_000}
 	withCaution := func(t *testing.T) *App {
 		u := loaded(t)
@@ -443,7 +450,7 @@ func TestCleanAll(t *testing.T) {
 	t.Run("it does not touch the checkboxes on screen", func(t *testing.T) {
 		u := loaded(t)
 
-		u.cleanAll(u.states...) // откроется окно проверки; «Отмена» ничего не изменит
+		u.cleanAll(u.states...) // the review window opens; "Cancel" changes nothing
 
 		if u.sel.Len() != 0 {
 			t.Errorf("selection = %v, want untouched", u.sel.Items())
@@ -456,11 +463,11 @@ func TestCleanAll(t *testing.T) {
 			t.Fatal("both Clean All buttons should be on when safe items are found")
 		}
 
-		// When: раздел docker снова сканируется
+		// When: the docker section is scanned again
 		u.states[1].scanning = true
 		u.refresh()
 
-		// Then: общая кнопка ждёт конца сканирования, а кнопка раздела xcode — нет
+		// Then: the shared button waits for the scan to end, and the xcode section's button doesn't
 		if !u.cleanEvery.Disabled() {
 			t.Error("global Clean All should wait until scanning finishes")
 		}
@@ -468,13 +475,167 @@ func TestCleanAll(t *testing.T) {
 			t.Error("Clean All in xcode should stay on: xcode is not scanning")
 		}
 
-		// When: в xcode осталось только «Осторожно»
+		// When: only "Caution" is left in xcode
 		u.states[0].items = []core.Item{emulator}
 		u.refresh()
 
-		// Then: кнопка раздела выключена
+		// Then: the section's button is disabled
 		if !u.cleanAllBtn.Disabled() {
 			t.Error("Clean All in xcode should be off: nothing safe there")
 		}
 	})
+}
+
+func TestNeverClean(t *testing.T) {
+	t.Run("Never Clean protects the selected items and remembers them", func(t *testing.T) {
+		// Given: Lingary is selected
+		u := loaded(t)
+		_ = u.sel.Add(derived)
+
+		// When: Never Clean
+		u.neverClean()
+
+		// Then: it can't be selected, isn't in Clean All Safe, and is on the list
+		got := byID(u, derived.ID)
+		if ok, why := got.CanSelect(); ok || why.Key != reasonExcluded {
+			t.Errorf("Lingary: selectable = %v, reason = %+v; want protected by Never clean", ok, why)
+		}
+		if u.sel.Len() != 0 {
+			t.Errorf("selection = %v, want empty", u.sel.Items())
+		}
+		if u.safeSelection(u.states...).Contains(got) {
+			t.Error("Clean All Safe must skip Never clean items")
+		}
+		if list := u.opts.Settings.Excluded(); len(list) != 1 || list[0].ID != derived.ID {
+			t.Errorf("saved list = %v", list)
+		}
+	})
+
+	t.Run("Allow cleaning takes it off the list", func(t *testing.T) {
+		u := loaded(t)
+		_ = u.sel.Add(derived)
+		u.neverClean()
+
+		u.allowCleaning(byID(u, derived.ID))
+
+		if ok, _ := byID(u, derived.ID).CanSelect(); !ok {
+			t.Error("Lingary should be selectable again")
+		}
+		if len(u.opts.Settings.Excluded()) != 0 {
+			t.Errorf("list = %v, want empty", u.opts.Settings.Excluded())
+		}
+	})
+
+	t.Run("a folder covers what's inside it and what contains it, nothing else", func(t *testing.T) {
+		// Given: the folder ~/Projects/app is on the list
+		u := loaded(t)
+		u.opts.Settings.SetExcluded([]settings.Exclusion{{ID: "/Users/me/Projects/app", Name: "app", Detail: "~/Projects/app"}})
+		u.states[0].items = []core.Item{
+			{ID: "/Users/me/Projects/app/node_modules", CategoryID: "xcode.cache", Name: "inside", Size: 1},
+			{ID: "/Users/me/Projects", CategoryID: "xcode.cache", Name: "contains", Size: 1},
+			{ID: "/Users/me/Projects/application/node_modules", CategoryID: "xcode.cache", Name: "neighbour", Size: 1},
+		}
+
+		// When: the list is applied
+		u.applyExclusions()
+
+		// Then
+		for _, name := range []string{"inside", "contains"} {
+			if ok, why := byName(u, name).CanSelect(); ok || why.Key != reasonExcludedFolder || why.Args["Folder"] != "~/Projects/app" {
+				t.Errorf("%s: selectable = %v, reason = %+v; want protected by the folder", name, ok, why)
+			}
+		}
+		if ok, _ := byName(u, "neighbour").CanSelect(); !ok {
+			t.Error("~/Projects/application is not inside ~/Projects/app and must stay selectable")
+		}
+	})
+
+	t.Run("a provider's own protection is kept", func(t *testing.T) {
+		u := loaded(t)
+		own := core.Item{ID: "p1", CategoryID: "xcode.cache", Name: "provider protected", Protected: &core.Reason{Key: "core.reason.in_use"}}
+		u.states[0].items = append(u.states[0].items, own)
+		u.opts.Settings.SetExcluded([]settings.Exclusion{{ID: "p1"}})
+
+		u.applyExclusions()
+		u.opts.Settings.SetExcluded(nil)
+		u.applyExclusions()
+
+		if got := byID(u, "p1"); got.Protected == nil || got.Protected.Key != "core.reason.in_use" {
+			t.Errorf("protection = %+v, want the provider's reason kept", got.Protected)
+		}
+	})
+}
+
+func TestPermissions(t *testing.T) {
+	t.Run("first launch asks before scanning", func(t *testing.T) {
+		// Given: a fresh install
+		a := test.NewTempApp(t)
+		store := settings.New(a.Preferences(), t.TempDir())
+		store.SetLanguage("en")
+
+		// When: the window opens
+		u, err := New(a, Options{Providers: []core.Provider{fakeProvider{id: "xcode"}}, Settings: store})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Then: the permissions window is shown and nothing is scanned yet
+		if u.win.Canvas().Overlays().Top() == nil {
+			t.Error("the permissions window should be shown on first launch")
+		}
+		if u.states[0].scanning {
+			t.Error("scanning should wait until the user continues")
+		}
+
+		// When: Continue with Downloads off
+		u.finishIntro(false, true)
+
+		// Then: the choice is saved and the scan starts
+		if store.UseDownloads() || !store.AllowAdmin() || !store.PermissionsAsked() {
+			t.Errorf("saved: downloads = %v, admin = %v, asked = %v", store.UseDownloads(), store.AllowAdmin(), store.PermissionsAsked())
+		}
+		if !u.states[0].scanning {
+			t.Error("the scan should start after Continue")
+		}
+	})
+
+	t.Run("with the administrator password off, such items are left out", func(t *testing.T) {
+		// Given: one item needs the password, and that's turned off
+		u := loaded(t)
+		needsPassword := core.Item{ID: "admin-dyld", CategoryID: "xcode.cache", Name: "dyld cache", Size: 10}
+		u.states[0].items = append(u.states[0].items, needsPassword)
+		u.opts.Settings.SetAllowAdmin(false)
+		sel := u.safeSelection(u.states[0])
+
+		// When
+		left, skipped := u.withoutAdmin(sel)
+
+		// Then
+		if skipped != 1 || left.Contains(needsPassword) || !left.Contains(derived) {
+			t.Errorf("skipped = %d, left = %v", skipped, left.Items())
+		}
+	})
+}
+
+// byID and byName find an item in the window's current results.
+func byID(u *App, id string) core.Item {
+	for _, st := range u.states {
+		for _, it := range st.items {
+			if it.ID == id {
+				return it
+			}
+		}
+	}
+	return core.Item{}
+}
+
+func byName(u *App, name string) core.Item {
+	for _, st := range u.states {
+		for _, it := range st.items {
+			if it.Name == name {
+				return it
+			}
+		}
+	}
+	return core.Item{}
 }

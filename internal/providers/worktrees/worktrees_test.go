@@ -13,10 +13,10 @@ import (
 	"disk-cleaner/internal/shell"
 )
 
-// git запускает настоящий git (он есть на любом Mac с Xcode).
+// git runs the real git (every Mac with Xcode has it).
 func git(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	// -c user.name/email — чтобы коммит не требовал настроек машины.
+	// -c user.name/email so that the commit does not need any machine setup.
 	full := append([]string{"-C", dir, "-c", "user.name=test", "-c", "user.email=test@example.com"}, args...)
 	if out, err := shell.Run(context.Background(), "/usr/bin/git", full...); err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, out)
@@ -33,18 +33,18 @@ func write(t *testing.T, path, content string) {
 	}
 }
 
-// fakeProjects — папка проектов с репозиторием courses и его worktree
-// в courses/.claude/worktrees/merge-main, как у Claude Code.
+// fakeProjects is a projects folder with a courses repository and its worktree
+// in courses/.claude/worktrees/merge-main, like Claude Code makes.
 func fakeProjects(t *testing.T) (root, wt string) {
 	t.Helper()
 
-	// EvalSymlinks: на macOS временные папки лежат за ссылкой /var → /private/var,
-	// а git возвращает «настоящие» пути. Приводим к одному виду.
+	// EvalSymlinks: on macOS temp folders sit behind the link /var → /private/var,
+	// while git returns the "real" paths. Bring both to one form.
 	root, _ = filepath.EvalSymlinks(t.TempDir())
 	repo := filepath.Join(root, "courses")
 
 	write(t, filepath.Join(repo, ".gitignore"), "node_modules/\nPods/\n")
-	write(t, filepath.Join(repo, "build", "config.txt"), "tracked build folder") // build НЕ игнорируется
+	write(t, filepath.Join(repo, "build", "config.txt"), "tracked build folder") // build is NOT ignored
 	git(t, root, "init", "-q", repo)
 	git(t, repo, "add", ".")
 	git(t, repo, "commit", "-q", "-m", "init")
@@ -52,13 +52,13 @@ func fakeProjects(t *testing.T) (root, wt string) {
 	wt = filepath.Join(repo, ".claude", "worktrees", "merge-main")
 	git(t, repo, "worktree", "add", "-q", "-b", "main-next", wt)
 
-	// Артефакты в worktree: игнорируемые node_modules и ios/Pods,
-	// и отслеживаемая папка build — её трогать нельзя.
+	// Artifacts in the worktree: ignored node_modules and ios/Pods,
+	// and the tracked build folder, which must not be touched.
 	write(t, filepath.Join(wt, "node_modules", "react", "index.js"), "x")
 	write(t, filepath.Join(wt, "ios", "Pods", "Manifest.lock"), "x")
 	write(t, filepath.Join(wt, "build", "out.txt"), "x")
 
-	// node_modules основного репозитория — это не worktree, его не трогаем.
+	// node_modules of the main repository is not a worktree, so we leave it alone.
 	write(t, filepath.Join(repo, "node_modules", "react", "index.js"), "x")
 
 	return root, wt
@@ -93,8 +93,8 @@ func TestScan(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// Then: node_modules и ios/Pods из worktree; ни отслеживаемого build,
-		// ни node_modules основного репозитория.
+		// Then: node_modules and ios/Pods from the worktree; neither the tracked build
+		// nor the main repository's node_modules.
 		want := []string{"merge-main · ios/Pods", "merge-main · node_modules"}
 		if got := names(items); !slices.Equal(got, want) {
 			t.Errorf("items = %v, want %v", got, want)

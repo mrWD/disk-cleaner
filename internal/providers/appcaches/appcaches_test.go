@@ -21,8 +21,8 @@ func write(t *testing.T, path string) {
 	}
 }
 
-// fakeHome — кэши и логи, как на этом Mac. Минимальные размеры сняты,
-// чтобы маленькие тестовые файлы попадали в список.
+// fakeHome is caches and logs like on this Mac. The minimum sizes are removed
+// so that small test files make it into the list.
 func fakeHome(t *testing.T, processes ...string) *Provider {
 	t.Helper()
 	home := t.TempDir()
@@ -32,13 +32,13 @@ func fakeHome(t *testing.T, processes ...string) *Provider {
 	write(t, filepath.Join(caches, "com.spotify.client", "Data", "x"))
 	write(t, filepath.Join(caches, "com.todesktop.230313mzl4w4u92.ShipIt", "update.zip"))
 	write(t, filepath.Join(caches, "orca-updater", "pending.zip"))
-	write(t, filepath.Join(caches, "CocoaPods", "Pods", "x"))              // владелец — «Кэши пакетов»
-	write(t, filepath.Join(caches, "com.apple.Safari", "x"))               // системный кэш Apple
-	write(t, filepath.Join(caches, "com.anthropic.claudefordesktop", "x")) // кэш Claude
-	write(t, filepath.Join(caches, "claude-cli-nodejs", "x"))              // кэш Claude Code
-	write(t, filepath.Join(caches, "GeoServices", "x"))                    // карты Apple
+	write(t, filepath.Join(caches, "CocoaPods", "Pods", "x"))              // owned by "Package caches"
+	write(t, filepath.Join(caches, "com.apple.Safari", "x"))               // Apple system cache
+	write(t, filepath.Join(caches, "com.anthropic.claudefordesktop", "x")) // Claude cache
+	write(t, filepath.Join(caches, "claude-cli-nodejs", "x"))              // Claude Code cache
+	write(t, filepath.Join(caches, "GeoServices", "x"))                    // Apple maps
 	write(t, filepath.Join(home, "Library", "Logs", "Homebrew", "brew.log"))
-	write(t, filepath.Join(home, "Library", "Logs", "Claude", "main.log")) // логи Claude
+	write(t, filepath.Join(home, "Library", "Logs", "Claude", "main.log")) // Claude logs
 
 	return &Provider{
 		home:      home,

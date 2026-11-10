@@ -1,9 +1,9 @@
-// Package packagecaches — провайдер кэшей менеджеров пакетов и
-// инструментов разработки: npm, Yarn, CocoaPods, Gradle, uv, pip,
-// Homebrew, Go, Swift Package Manager, браузеры Puppeteer и Playwright.
+// Package packagecaches is the provider for caches of package managers and
+// development tools: npm, Yarn, CocoaPods, Gradle, uv, pip,
+// Homebrew, Go, Swift Package Manager, Puppeteer and Playwright browsers.
 //
-// Всё это — скачанные копии того, что лежит в интернете. Удаление
-// безопасно: инструмент скачает нужное снова при следующей установке.
+// All of this is downloaded copies of what lives on the internet. Deleting it
+// is safe: the tool will download what it needs again on the next install.
 package packagecaches
 
 import (
@@ -20,38 +20,38 @@ import (
 //go:embed translations
 var translations embed.FS
 
-// Причина: работает демон Gradle (текст в translations).
+// Reason: a Gradle daemon is running (text is in translations).
 const reasonGradleDaemon = "packagecaches.gradle_daemon"
 
-// folder — одна папка кэша: как её назвать и где она (путь от домашней папки).
-// В пути можно писать * (как в терминале): ".gradle/jdks/*.tar.gz" —
-// тогда каждый найденный файл станет отдельной строкой.
+// folder is one cache folder: what to call it and where it is (path from the home folder).
+// The path may contain * (like in the terminal): ".gradle/jdks/*.tar.gz",
+// and then each found file becomes a separate row.
 type folder struct {
 	name string
 	path string
 }
 
-// cache — одна категория: ID, риск и папки, которые в неё входят.
+// cache is one category: ID, risk and the folders it includes.
 type cache struct {
 	id      string
 	risk    core.Risk
 	folders []folder
 }
 
-// caches — всё, что умеет находить провайдер. Добавить новый кэш —
-// это одна запись здесь и четыре текста в translations/*.json.
+// caches is everything the provider can find. Adding a new cache is
+// one entry here and four texts in translations/*.json.
 var caches = []cache{
 	{"packagecaches.npm", core.RiskSafe, []folder{
 		{"npm", ".npm/_cacache"},
-		{"npx cache", ".npm/_npx"}, // пакеты, скачанные командой npx
+		{"npx cache", ".npm/_npx"}, // packages downloaded by the npx command
 	}},
 	{"packagecaches.yarn", core.RiskSafe, []folder{{"Yarn", "Library/Caches/Yarn"}}},
 	{"packagecaches.cocoapods", core.RiskSafe, []folder{{"CocoaPods", "Library/Caches/CocoaPods"}}},
 	{"packagecaches.gradle", core.RiskSafe, []folder{
 		{"Gradle caches", ".gradle/caches"},
 		{"Gradle wrapper distributions", ".gradle/wrapper/dists"},
-		// Архивы, из которых Gradle распаковал JDK. Сами распакованные JDK
-		// не трогаем: без них сборка может не найти нужную версию Java.
+		// Archives that Gradle unpacked JDKs from. We do not touch the unpacked JDKs
+		// themselves: without them a build may not find the right Java version.
 		{"Gradle JDK download", ".gradle/jdks/*.tar.gz"},
 		{"Gradle JDK download", ".gradle/jdks/*.zip"},
 	}},
@@ -91,13 +91,13 @@ var caches = []cache{
 	{"packagecaches.python", core.RiskSafe, []folder{{"Python bytecode", "Library/Caches/com.apple.python"}}},
 }
 
-// Provider ищет кэши в домашней папке.
+// Provider looks for caches in the home folder.
 type Provider struct {
 	home      string
-	processes func(ctx context.Context) []string // список процессов; в тестах — фейк
+	processes func(ctx context.Context) []string // list of processes; a fake in tests
 }
 
-// New — провайдер для текущего пользователя.
+// New is the provider for the current user.
 func New() *Provider {
 	return &Provider{home: kit.Home(), processes: kit.Processes}
 }
@@ -115,8 +115,8 @@ func (p *Provider) Categories() []core.Category {
 }
 
 func (p *Provider) Scan(ctx context.Context) ([]core.Item, error) {
-	// Работающий демон Gradle держит открытыми файлы в своём кэше:
-	// удалять кэш под ним — сломать идущую сборку.
+	// A running Gradle daemon keeps files in its cache open:
+	// deleting the cache under it would break a running build.
 	gradleRunning := kit.AnyProcess(p.processes(ctx), "GradleDaemon")
 
 	var items []core.Item
@@ -140,15 +140,15 @@ func (p *Provider) Scan(ctx context.Context) ([]core.Item, error) {
 	return items, nil
 }
 
-// expand — пути одной записи таблицы: сама папка или, если в пути есть *,
-// все подходящие файлы. Ключ — имя для показа: "Gradle JDK download · OpenJDK17U….tar.gz".
+// expand gives the paths of one table entry: the folder itself or, if the path has *,
+// all matching files. The key is the display name: "Gradle JDK download · OpenJDK17U….tar.gz".
 func (p *Provider) expand(f folder) map[string]string {
 	full := filepath.Join(p.home, f.path)
 	if !strings.ContainsAny(f.path, "*?[") {
 		return map[string]string{f.name: full}
 	}
 
-	matches, _ := filepath.Glob(full) // ошибка бывает только у неправильного шаблона
+	matches, _ := filepath.Glob(full) // an error only happens with a malformed pattern
 	out := map[string]string{}
 	for _, m := range matches {
 		out[f.name+" · "+filepath.Base(m)] = m
@@ -156,8 +156,8 @@ func (p *Provider) expand(f folder) map[string]string {
 	return out
 }
 
-// Plan: удалить папки. Кэш модулей Go — только для чтения; исполнитель
-// умеет снять эту защиту перед удалением.
+// Plan: delete the folders. The Go module cache is read-only; the executor
+// knows how to remove that protection before deleting.
 func (p *Provider) Plan(items []core.Item) ([]core.Action, error) {
 	return kit.RemoveActions(items), nil
 }

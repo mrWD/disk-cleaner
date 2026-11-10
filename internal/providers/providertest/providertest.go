@@ -1,8 +1,8 @@
-// Package providertest — общие проверки для тестов всех провайдеров.
+// Package providertest holds shared checks for the tests of all providers.
 //
-// Обычный (не _test.go) пакет, чтобы его могли импортировать тесты
-// из разных папок. В саму программу он не попадает: его импортируют
-// только тесты.
+// A regular package (not _test.go) so that tests in different folders can
+// import it. It does not end up in the program itself: only tests
+// import it.
 package providertest
 
 import (
@@ -12,14 +12,14 @@ import (
 	"disk-cleaner/internal/i18n"
 )
 
-// CheckTranslations проверяет, что у провайдера есть все тексты
-// на всех его языках:
-//   - "<id>.name" — имя провайдера в списке слева;
-//   - четыре текста каждой категории: title, what, why, after;
-//   - extraKeys — ключи причин защиты и недоступности, которые
-//     провайдер использует в коде (например "docker.not_running").
+// CheckTranslations checks that a provider has all its texts
+// in all of its languages:
+//   - "<id>.name": the provider's name in the list on the left;
+//   - four texts for each category: title, what, why, after;
+//   - extraKeys: keys of protection and unavailability reasons that the
+//     provider uses in code (for example "docker.not_running").
 //
-// Именно такой тест поймал бы опечатку вроде "core.reasong.in_use".
+// Exactly this kind of test would catch a typo like "core.reasong.in_use".
 func CheckTranslations(t *testing.T, p core.Provider, extraKeys ...string) {
 	t.Helper()
 
@@ -45,7 +45,7 @@ func CheckTranslations(t *testing.T, p core.Provider, extraKeys ...string) {
 				t.Errorf("%s.json: missing %q", lang, k)
 			}
 		}
-		// И наоборот: в переводе нет лишних ключей, которых нет в английском.
+		// And the other way round: the translation has no extra keys that English doesn't have.
 		for _, k := range catalog.Keys(lang) {
 			if !catalog.Has(i18n.Fallback, k) {
 				t.Errorf("%s.json: key %q is not in en.json", lang, k)
@@ -54,8 +54,8 @@ func CheckTranslations(t *testing.T, p core.Provider, extraKeys ...string) {
 	}
 }
 
-// CheckCategories проверяет, что все ID категорий начинаются с ID
-// провайдера и что объекты ссылаются только на свои категории.
+// CheckCategories checks that all category IDs start with the provider's
+// ID and that items refer only to their own categories.
 func CheckCategories(t *testing.T, p core.Provider, items []core.Item) {
 	t.Helper()
 

@@ -5,14 +5,14 @@ import (
 	"testing/fstest"
 )
 
-// testFS — «файловая система» в памяти: fstest.MapFS ведёт себя как папка
-// с файлами, но ничего не пишет на диск.
+// testFS is an in-memory "file system": fstest.MapFS behaves like a folder
+// of files but writes nothing to disk.
 var testFS = fstest.MapFS{
 	"tr/en.json": {Data: []byte(`{"hello": "Hello", "free": "Free: {{.Size}}", "only_en": "English only"}`)},
 	"tr/ru.json": {Data: []byte(`{"hello": "Привет", "free": "Свободно: {{.Size}}"}`)},
 }
 
-// catalog — каталог с тестовыми текстами и заданными языками системы.
+// catalog is a catalog with the test texts and the given system languages.
 func catalog(t *testing.T, system ...string) *Catalog {
 	t.Helper()
 	c := NewWithSystem(system)

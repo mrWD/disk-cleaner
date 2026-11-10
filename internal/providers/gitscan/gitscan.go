@@ -1,11 +1,11 @@
-// Package gitscan — общий поиск git-репозиториев и папок-«артефактов»
-// (node_modules, Pods, build…) в них. Им пользуются два провайдера:
-// worktrees (дополнительные рабочие копии) и projects (основные
-// репозитории). Провайдеры не импортируют друг друга, а этот хелпер — могут.
+// Package gitscan finds git repositories and "artifact" folders
+// (node_modules, Pods, build...) in them. Two providers use it:
+// worktrees (extra working copies) and projects (main
+// repositories). Providers don't import each other, but they may import this helper.
 //
-// Главное правило для обоих: удалять можно ТОЛЬКО то, что git игнорирует
-// (git check-ignore). Отслеживаемые файлы не трогаются никогда, даже если
-// папка называется build.
+// The main rule for both: ONLY what git ignores may be deleted
+// (git check-ignore). Tracked files are never touched, even if
+// the folder is called build.
 package gitscan
 
 import (
@@ -21,29 +21,29 @@ import (
 	"disk-cleaner/internal/shell"
 )
 
-// Git — путь к git. На Mac с Xcode он есть всегда.
+// Git is the path to git. A Mac with Xcode always has it.
 const Git = "/usr/bin/git"
 
-// MinSize — артефакты меньше этого размера не показываем: десятки
-// крошечных папок только засоряют список, а места почти не освобождают.
+// MinSize: artifacts smaller than this are not shown. Dozens of
+// tiny folders only clutter the list and free almost no space.
 const MinSize = 1_000_000
 
-// artifactNames — папки, которые обычно создаются установкой или сборкой.
+// artifactNames are folders that are usually created by an install or a build.
 var artifactNames = map[string]bool{
 	"node_modules": true, "Pods": true, "build": true, ".gradle": true,
 	".cxx": true, ".expo": true, ".next": true, ".turbo": true,
 	"dist": true, "DerivedData": true, ".venv": true, "venv": true,
-	"target": true, "release": true, "out": true, // release/, out/ — выход electron-builder и других
+	"target": true, "release": true, "out": true, // release/, out/ are the output of electron-builder and others
 }
 
-// buildExts — расширения готовых сборок приложений: архивы Xcode,
-// пакеты для iOS и Android, установщики macOS и Windows.
+// buildExts are extensions of finished app builds: Xcode archives,
+// iOS and Android packages, macOS and Windows installers.
 var buildExts = []string{
 	".xcarchive", ".ipa", ".app", ".apk", ".aab", ".dmg", ".pkg",
 	".exe", ".msi", ".appimage", ".deb",
 }
 
-// isBuild — похоже ли имя на готовую сборку.
+// isBuild reports whether the name looks like a finished build.
 func isBuild(name string) bool {
 	lower := strings.ToLower(name)
 	for _, ext := range buildExts {
@@ -54,8 +54,8 @@ func isBuild(name string) bool {
 	return false
 }
 
-// skipWhileSearching — куда не заходим, когда ищем репозитории:
-// там их не бывает, а файлов — миллионы.
+// skipWhileSearching lists where we don't go when looking for repositories:
+// there are none there, but there are millions of files.
 var skipWhileSearching = map[string]bool{
 	"node_modules": true, "Pods": true, "build": true, ".gradle": true,
 	"DerivedData": true, ".venv": true, "venv": true, "target": true,
@@ -63,26 +63,26 @@ var skipWhileSearching = map[string]bool{
 }
 
 const (
-	maxSearchDepth   = 6 // насколько глубоко от корня искать репозитории
-	maxArtifactDepth = 4 // насколько глубоко внутри репозитория искать артефакты
+	maxSearchDepth   = 6 // how deep from the root to look for repositories
+	maxArtifactDepth = 4 // how deep inside a repository to look for artifacts
 )
 
-// Kind — вид репозитория.
+// Kind is the kind of repository.
 type Kind int
 
 const (
-	Main     Kind = iota // основной: .git — это папка
-	Worktree             // дополнительный worktree: .git — файл "gitdir: …/worktrees/…"
+	Main     Kind = iota // main: .git is a folder
+	Worktree             // extra worktree: .git is a file "gitdir: .../worktrees/..."
 )
 
-// Repo — найденный репозиторий.
+// Repo is a repository that was found.
 type Repo struct {
 	Path string
 	Kind Kind
 }
 
-// KindOf — является ли dir репозиторием, и каким. ok = false — не репозиторий
-// (или подмодуль: у него .git тоже файл, но путь ведёт в .git/modules).
+// KindOf reports whether dir is a repository, and which kind. ok = false means it is not a repository
+// (or it is a submodule: its .git is also a file, but the path leads into .git/modules).
 func KindOf(dir string) (Kind, bool) {
 	info, err := os.Lstat(filepath.Join(dir, ".git"))
 	if err != nil {
@@ -103,9 +103,9 @@ func KindOf(dir string) (Kind, bool) {
 	return 0, false
 }
 
-// FindRepos ищет репозитории внутри root. В основной репозиторий заходит
-// дальше (внутри бывают .claude/worktrees и вложенные репозитории),
-// в worktree — нет.
+// FindRepos looks for repositories inside root. It keeps going into a main repository
+// (.claude/worktrees and nested repositories can be inside),
+// but not into a worktree.
 func FindRepos(root string) []Repo {
 	var found []Repo
 
@@ -125,7 +125,7 @@ func FindRepos(root string) []Repo {
 		}
 		found = append(found, Repo{Path: path, Kind: kind})
 		if kind == Worktree {
-			return fs.SkipDir // внутри worktree других не ищем
+			return fs.SkipDir // we don't look for other worktrees inside a worktree
 		}
 		return nil
 	})
@@ -133,9 +133,9 @@ func FindRepos(root string) []Repo {
 	return found
 }
 
-// FindArtifacts — пути (относительно repo) папок с именами из artifactNames.
-// Внутрь найденной не заходит: node_modules внутри node_modules не нужны.
-// Во вложенные репозитории и worktree тоже не заходит: у них свой владелец.
+// FindArtifacts returns the paths (relative to repo) of folders named in artifactNames.
+// It does not go inside a found one: node_modules inside node_modules is not needed.
+// It does not go into nested repositories and worktrees either: they have their own owner.
 func FindArtifacts(repo string) []string {
 	var found []string
 
@@ -155,7 +155,7 @@ func FindArtifacts(repo string) []string {
 			return fs.SkipDir
 		}
 		if _, nested := KindOf(path); nested {
-			return fs.SkipDir // другой репозиторий — не наш
+			return fs.SkipDir // another repository, not ours
 		}
 		return nil
 	})
@@ -163,10 +163,10 @@ func FindArtifacts(repo string) []string {
 	return found
 }
 
-// FindBuilds — готовые сборки (.xcarchive, .apk, .dmg, .app…), которые
-// лежат в репозитории вне папок-артефактов: например архив, сохранённый
-// прямо в корень проекта. Пути — относительно repo. Внутрь найденной
-// сборки (.app и .xcarchive — это папки) не заходит.
+// FindBuilds returns finished builds (.xcarchive, .apk, .dmg, .app...) that
+// lie in the repository outside artifact folders: for example an archive saved
+// right in the project root. Paths are relative to repo. It does not go inside a found
+// build (.app and .xcarchive are folders).
 func FindBuilds(repo string) []string {
 	var found []string
 
@@ -191,7 +191,7 @@ func FindBuilds(repo string) []string {
 
 		switch {
 		case name == ".git", artifactNames[name]:
-			return fs.SkipDir // папки сборки и так показываются целиком
+			return fs.SkipDir // build folders are shown as a whole anyway
 		case strings.Count(rel, "/") >= maxArtifactDepth-1:
 			return fs.SkipDir
 		}
@@ -204,10 +204,10 @@ func FindBuilds(repo string) []string {
 	return found
 }
 
-// Untracked оставляет из candidates то, что git НЕ отслеживает (новые
-// или игнорируемые файлы). git ls-files печатает отслеживаемые файлы;
-// для папки — файлы внутри неё. Ошибка — считаем всё отслеживаемым
-// и не предлагаем ничего: так безопаснее.
+// Untracked keeps those of candidates that git does NOT track (new
+// or ignored files). git ls-files prints tracked files;
+// for a folder, the files inside it. On an error we assume everything is tracked
+// and offer nothing: that is safer.
 func Untracked(ctx context.Context, run shell.Runner, repo string, candidates []string) []string {
 	if len(candidates) == 0 {
 		return nil
@@ -232,9 +232,9 @@ func Untracked(ctx context.Context, run shell.Runner, repo string, candidates []
 	return result
 }
 
-// Ignored оставляет из candidates только то, что git игнорирует.
-// git check-ignore печатает игнорируемые пути и завершается с кодом 1,
-// если таких нет. Любая ошибка — значит, не удаляем ничего: так безопаснее.
+// Ignored keeps only those of candidates that git ignores.
+// git check-ignore prints ignored paths and exits with code 1
+// if there are none. Any error means we delete nothing: that is safer.
 func Ignored(ctx context.Context, run shell.Runner, repo string, candidates []string) []string {
 	if len(candidates) == 0 {
 		return nil
@@ -246,14 +246,14 @@ func Ignored(ctx context.Context, run shell.Runner, repo string, candidates []st
 	var result []string
 	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
 		line = strings.TrimSuffix(strings.TrimSpace(line), "/")
-		if slices.Contains(candidates, line) { // только то, о чём спрашивали
+		if slices.Contains(candidates, line) { // only what we asked about
 			result = append(result, line)
 		}
 	}
 	return result
 }
 
-// Branch — имя ветки ("detached", если HEAD не на ветке; "" — не удалось узнать).
+// Branch is the branch name ("detached" if HEAD is not on a branch; "" if it could not be found out).
 func Branch(ctx context.Context, run shell.Runner, repo string) string {
 	out, err := run(ctx, Git, "-C", repo, "rev-parse", "--abbrev-ref", "HEAD")
 	name := strings.TrimSpace(string(out))
@@ -266,7 +266,7 @@ func Branch(ctx context.Context, run shell.Runner, repo string) string {
 	return name
 }
 
-// LastCommit — когда был последний коммит (нулевое время — коммитов нет).
+// LastCommit is the time of the last commit (zero time means no commits).
 func LastCommit(ctx context.Context, run shell.Runner, repo string) time.Time {
 	out, err := run(ctx, Git, "-C", repo, "log", "-1", "--format=%ct")
 	if err != nil {

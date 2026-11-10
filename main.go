@@ -1,10 +1,10 @@
-// Disk Cleaner — приложение для macOS, которое находит то, что занимает
-// место и может быть безопасно удалено: кэши Xcode и менеджеров пакетов,
-// Docker, симуляторы, эмуляторы Android, node_modules в старых worktree.
+// Disk Cleaner is a macOS app that finds what takes up space and can be
+// deleted safely: Xcode and package manager caches, Docker, simulators,
+// Android emulators, node_modules in old worktrees.
 //
-// main.go — «точка сборки»: единственное место, которое знает обо всех
-// провайдерах. Чтобы убрать провайдер — удалите его строку ниже и его
-// папку в internal/providers. Больше ничего менять не нужно.
+// main.go is the "assembly point": the only place that knows about all the
+// providers. To remove a provider, delete its line below and its folder
+// in internal/providers. Nothing else needs to change.
 package main
 
 import (
@@ -30,8 +30,8 @@ import (
 	"disk-cleaner/internal/ui"
 )
 
-// appID — уникальный идентификатор приложения. Нужен, чтобы macOS хранила
-// его настройки отдельно от других программ.
+// appID is the app's unique identifier. It is needed so that macOS keeps
+// the app's settings separate from other programs.
 const appID = "io.github.mrwd.diskcleaner"
 
 func main() {
@@ -40,12 +40,12 @@ func main() {
 
 	ex, err := executor.New()
 	if err != nil {
-		log.Fatal(err) // напечатать ошибку и завершить программу
+		log.Fatal(err) // print the error and exit the program
 	}
 
-	// Порядок здесь — порядок в списке слева.
+	// The order here is the order in the list on the left.
 	providers := []core.Provider{
-		worktrees.New(store.Roots), // store.Roots без скобок: передаём функцию, а не результат
+		worktrees.New(store.Roots), // store.Roots without parentheses: we pass the function, not its result
 		projects.New(store.Roots),
 		xcode.New(),
 		simulators.New(),
@@ -55,7 +55,7 @@ func main() {
 		devtools.New(),
 		packagecaches.New(),
 		appcaches.New(),
-		downloads.New(), // спросит у macOS доступ к «Загрузкам»
+		downloads.New(store.UseDownloads), // will ask macOS for access to Downloads, if it is turned on in settings
 	}
 
 	if err := ui.Run(a, ui.Options{Providers: providers, Executor: ex, Settings: store}); err != nil {

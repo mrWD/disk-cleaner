@@ -15,21 +15,21 @@ import (
 	"disk-cleaner/internal/core"
 )
 
-// Правая часть окна состоит из двух частей:
-//   - шапка (detailsTop): крупный заголовок, поле поиска и «Выбрать все».
-//     Она НЕ перестраивается при каждом нажатии клавиши — иначе поле
-//     поиска пересоздавалось бы и теряло фокус;
-//   - список (list): плашки категорий. Он перестраивается целиком.
+// The right-hand part of the window has two parts:
+//   - the header (detailsTop): a large title, the search field and "Select All".
+//     It is NOT rebuilt on every key press, otherwise the search field
+//     would be recreated and lose focus;
+//   - the list (list): the category cards. It is rebuilt completely.
 //
-// По умолчанию всё компактно: категория — одна строка заголовка,
-// объект — одна строка (галочка, имя, путь, метка состояния, размер).
-// Клик по заголовку категории раскрывает объяснения и подробности.
+// By default everything is compact: a category is one header row,
+// an item is one row (checkbox, name, path, state label, size).
+// A click on a category header expands the explanations and details.
 
-// checkIndent — насколько сдвинуть подпись под галочкой, чтобы она
-// начиналась ровно под текстом, а не под квадратиком.
+// checkIndent is how far to shift the caption under the checkbox so that it
+// starts exactly under the text, not under the little square.
 const checkIndent = 31
 
-// viewKey — что сейчас показано справа: результаты поиска или раздел.
+// viewKey is what is shown on the right now: search results or a section.
 func (u *App) viewKey() string {
 	if u.searching() {
 		return "search"
@@ -37,17 +37,17 @@ func (u *App) viewKey() string {
 	return fmt.Sprintf("section:%d", u.current)
 }
 
-// refreshDetails обновляет правую часть: шапку — только если сменился
-// вид, список — всегда, сохраняя позицию прокрутки.
+// refreshDetails updates the right-hand part: the header only if the
+// view changed, the list always, keeping the scroll position.
 func (u *App) refreshDetails() {
 	if u.details == nil || len(u.states) == 0 {
 		return
 	}
 
-	// Выбор принадлежит тому, что видно. Перешли в другой раздел или в
-	// поиск — отметки снимаются: иначе в нижней полосе оставались бы
-	// объекты, которых на экране нет, и их легко было бы удалить случайно.
-	// Смена языка или оформления вид не меняет — там отметки остаются.
+	// The selection belongs to what is visible. If we moved to another section or to
+	// a search, the marks are cleared: otherwise the bottom strip would keep
+	// items that are not on screen, and it would be easy to delete them by accident.
+	// A change of language or appearance does not change the view, so the marks stay.
 	if key := u.viewKey(); key != u.selView {
 		u.selView = key
 		if u.sel.Len() > 0 {
@@ -86,8 +86,8 @@ func (u *App) refreshDetails() {
 	u.list.Refresh()
 }
 
-// buildTop — шапка: значок и крупный заголовок, подзаголовок, ниже
-// поле поиска по разделу и кнопки «Выбрать все» и «Очистить всё».
+// buildTop builds the header: an icon and a large title, a subtitle, and below
+// the section search field and the "Select All" and "Clean All Safe" buttons.
 func (u *App) buildTop() *fyne.Container {
 	var icon []byte
 	tint := theme.Color(colorUsed)
@@ -97,18 +97,19 @@ func (u *App) buildTop() *fyne.Container {
 
 	if !u.searching() {
 		st := u.states[u.current]
-		// «Очистить всё» — всё безопасное в этом разделе. Сначала всё равно
-		// откроется окно проверки со списком команд.
-		u.cleanAllBtn = widget.NewButtonWithIcon(u.t("button.clean_all"), theme.DeleteIcon(), func() { u.cleanAll(st) })
+		// "Clean All Safe" means everything safe in this section. The review
+		// window with the list of commands still opens first.
+		// The label with the size changes after every scan; updateTop keeps it current.
+		u.cleanAllBtn = widget.NewButtonWithIcon(u.cleanSafeLabel(st), theme.DeleteIcon(), func() { u.cleanAll(st) })
 		icon, tint = u.look(st.provider)
 		name = u.t(st.provider.ID() + ".name")
-		u.sectionQuery = "" // новый раздел — поиск с чистого листа
+		u.sectionQuery = "" // a new section: search starts from a clean slate
 		search = searchField(u.t("search.section", map[string]any{"Section": name}), "", u.setSectionQuery)
 	}
 
-	// Заголовок и подзаголовок — простые надписи canvas.Text: у них нет
-	// внутренних отступов (в отличие от Label и RichText), поэтому обе строки
-	// начинаются ровно от одного края и стоят плотно друг под другом.
+	// The title and subtitle are plain canvas.Text labels: they have no
+	// inner padding (unlike Label and RichText), so both lines
+	// start exactly at the same edge and sit tightly one under the other.
 	title := text(name, sizeTitle, theme.ColorNameForeground, true)
 	u.subtitle = text("", theme.SizeNameText, colorSecondary, false)
 
@@ -120,8 +121,8 @@ func (u *App) buildTop() *fyne.Container {
 			container.NewStack(roundedRect(tint, 11), pad(11, 11, 11, 11, symbol(theme.SearchIcon(), theme.ColorNameForegroundOnPrimary, 26))))
 	}
 
-	// Значок слева, справа — две строки, по вертикали ровно по центру значка:
-	// пустые «распорки» (Spacer) сверху и снизу делят свободное место поровну.
+	// The icon on the left, two lines on the right, centred vertically on the icon:
+	// empty "struts" (Spacer) above and below split the free space equally.
 	lines := container.New(layout.NewCustomPaddedVBoxLayout(2), title, u.subtitle)
 	heading := container.New(layout.NewCustomPaddedHBoxLayout(14),
 		mark,
@@ -138,9 +139,9 @@ func (u *App) buildTop() *fyne.Container {
 	return pad(14, 8, 20, 20, container.NewVBox(heading, gap(0, 4), toolbar))
 }
 
-// updateTop меняет в шапке то, что зависит от данных: подзаголовок,
-// надпись «Выбрать все / Снять все» и доступность «Очистить всё».
-// Само поле поиска не трогается.
+// updateTop changes what depends on the data in the header: the subtitle,
+// the "Select All / Deselect All" label and whether "Clean All Safe" is enabled.
+// The search field itself is not touched.
 func (u *App) updateTop() {
 	if u.subtitle == nil {
 		return
@@ -149,8 +150,18 @@ func (u *App) updateTop() {
 	setText(u.subtitle, u.subtitleText())
 
 	if u.cleanAllBtn != nil {
-		if len(safeItems(u.states[u.current])) == 0 {
-			u.cleanAllBtn.Disable() // безопасного нет (или раздел ещё сканируется)
+		st := u.states[u.current]
+		safe := safeItems(st)
+
+		// A longer label makes the button wider, but the toolbar around it
+		// doesn't notice by itself: without relayout the button would overlap
+		// Select All.
+		if label := u.cleanSafeLabel(st); label != u.cleanAllBtn.Text {
+			u.cleanAllBtn.SetText(label)
+			u.relayout()
+		}
+		if len(safe) == 0 {
+			u.cleanAllBtn.Disable()
 		} else {
 			u.cleanAllBtn.Enable()
 		}
@@ -172,7 +183,21 @@ func (u *App) updateTop() {
 	}
 }
 
-// subtitleText — строка под заголовком.
+// cleanSafeLabel — "Clean All Safe (1.6 GB)" for one section. "(0 B)" explains
+// a disabled button by itself: nothing here is Safe and free to remove (for
+// example, all of it is in use).
+func (u *App) cleanSafeLabel(st *providerState) string {
+	if st.scanning {
+		return u.t("button.clean_safe.scanning")
+	}
+	var size core.Bytes
+	for _, it := range safeItems(st) {
+		size += it.Size
+	}
+	return u.t("button.clean_safe", map[string]any{"Size": size.String()})
+}
+
+// subtitleText is the line under the title.
 func (u *App) subtitleText() string {
 	if u.searching() {
 		var count int
@@ -205,7 +230,7 @@ func (u *App) subtitleText() string {
 	})
 }
 
-// buildSection — список открытого раздела: плашки категорий.
+// buildSection builds the list of the open section: the category cards.
 func (u *App) buildSection(st *providerState) fyne.CanvasObject {
 	if st.scanning {
 		return widget.NewProgressBarInfinite()
@@ -223,7 +248,7 @@ func (u *App) buildSection(st *providerState) fyne.CanvasObject {
 		out = append(out, secondary(u.t("search.nothing", map[string]any{"Query": query}), true))
 
 	case query == "" && len(groups) > 0:
-		// Пустые категории — одной строкой внизу: видно, что их проверили.
+		// Empty categories go in one line at the bottom: it shows they were checked.
 		var empty []string
 		for _, cat := range st.provider.Categories() {
 			if len(itemsOf(st.items, cat.ID)) == 0 {
@@ -238,8 +263,8 @@ func (u *App) buildSection(st *providerState) fyne.CanvasObject {
 	return container.NewVBox(out...)
 }
 
-// buildSearchResults — результаты глобального поиска по разделам:
-// заголовок раздела со значком и под ним его найденные категории.
+// buildSearchResults shows the results of the global search by section:
+// the section header with an icon and under it the categories found in it.
 func (u *App) buildSearchResults() fyne.CanvasObject {
 	var out []fyne.CanvasObject
 	var scanning []string
@@ -259,7 +284,7 @@ func (u *App) buildSearchResults() fyne.CanvasObject {
 			size += total(g.items)
 		}
 
-		// Заголовок раздела: клик открывает сам раздел.
+		// Section header: a click opens the section itself.
 		icon, tint := u.look(st.provider)
 		open := newTappable(pad(4, 4, 4, 4, container.NewBorder(nil, nil,
 			container.NewHBox(badge(icon, tint, 22), container.NewCenter(text(u.t(st.provider.ID()+".name"), theme.SizeNameSubHeadingText, theme.ColorNameForeground, true))),
@@ -282,14 +307,14 @@ func (u *App) buildSearchResults() fyne.CanvasObject {
 	return container.NewVBox(out...)
 }
 
-// buildCategory — плашка категории. Свёрнутая (по умолчанию): одна
-// строка заголовка и по строке на объект. Развёрнутая: плюс объяснения
-// «что это / почему можно / что будет» и полные подробности объектов.
+// buildCategory builds a category card. Collapsed (the default): one
+// header row and one row per item. Expanded: plus the explanations
+// "What it is. / Why it's safe. / After cleaning." and the full details of the items.
 func (u *App) buildCategory(g group) fyne.CanvasObject {
 	cat, items := g.cat, g.items
 	open := u.expanded[cat.ID]
 
-	// Галочка категории: выбраны все — галочка, часть — черта, ничего — пусто.
+	// The category checkbox: all selected is a tick, some is a dash, none is empty.
 	var selectable []core.Item
 	for _, it := range items {
 		if ok, _ := it.CanSelect(); ok {
@@ -320,7 +345,7 @@ func (u *App) buildCategory(g group) fyne.CanvasObject {
 		groupCheck.Disable()
 	}
 
-	// Остальной заголовок — кликабельный: раскрыть или свернуть.
+	// The rest of the header is clickable: expand or collapse.
 	chevron := theme.MenuExpandIcon()
 	if open {
 		chevron = theme.MenuDropDownIcon()
@@ -340,7 +365,7 @@ func (u *App) buildCategory(g group) fyne.CanvasObject {
 	parts := []fyne.CanvasObject{container.NewBorder(nil, nil, groupCheck, nil, toggle)}
 
 	if open {
-		// Требование: рядом с кнопками — что это и почему это можно удалить.
+		// Requirement: next to the buttons, what it is and why it is safe to delete.
 		parts = append(parts, pad(0, 4, checkIndent, 0, container.NewVBox(
 			explainRow(theme.InfoIcon(), u.t("label.what"), u.t(cat.WhatKey())),
 			explainRow(theme.ConfirmIcon(), u.t("label.why"), u.t(cat.WhyKey())),
@@ -359,8 +384,8 @@ func (u *App) buildCategory(g group) fyne.CanvasObject {
 	return pad(0, 8, 0, 0, card(container.NewVBox(parts...)))
 }
 
-// explainRow — строка объяснения: маленький серый значок и текст
-// «Заголовок. Пояснение», где заголовок чуть темнее.
+// explainRow is an explanation row: a small grey icon and text
+// "Heading. Explanation", where the heading is a little darker.
 func explainRow(icon fyne.Resource, heading, body string) fyne.CanvasObject {
 	rt := widget.NewRichText(
 		&widget.TextSegment{Text: heading + " ", Style: widget.RichTextStyle{
@@ -378,14 +403,14 @@ func explainRow(icon fyne.Resource, heading, body string) fyne.CanvasObject {
 		nil, rt)
 }
 
-// itemRow — строка объекта.
+// itemRow is an item row.
 //
-// Компактно — одна строка: галочка с именем, серым путь (обрезается «…»),
-// оранжевая метка, если выбрать нельзя («Running», «In use»), и размер.
-// Развёрнуто — путь целиком и полная причина под строкой.
+// Compact is one line: a checkbox with the name, the path in grey (cut off with "…"),
+// an orange label if it can't be selected ("Running", "In use"), and the size.
+// Expanded: the full path and the full reason under the row.
 func (u *App) itemRow(it core.Item, expanded bool) fyne.CanvasObject {
 	check := widget.NewCheck(it.Name, nil)
-	// Ставим состояние ДО назначения OnChanged, чтобы не вызвать обработчик.
+	// Set the state BEFORE assigning OnChanged, so as not to trigger the handler.
 	check.Checked = u.sel.Contains(it)
 	check.OnChanged = func(on bool) {
 		if on {
@@ -426,13 +451,21 @@ func (u *App) itemRow(it core.Item, expanded bool) fyne.CanvasObject {
 			pad(6, 0, 0, 0, container.NewVBox(symbol(theme.WarningIcon(), theme.ColorNameWarning, 13))),
 			nil,
 			colored(u.reason(*why), theme.ColorNameWarning))))
+
+		// The item itself is on the "Never clean" list: it can come off right here.
+		// (For an item inside a listed folder, the folder is changed in Settings.)
+		if why.Key == reasonExcluded {
+			lines.Add(indent(container.NewHBox(link(u.t("button.allow_clean"), func() { u.allowCleaning(it) }))))
+		}
 	}
 	return lines
 }
 
-// shortStatus — короткая метка для компактной строки: почему нельзя выбрать.
+// shortStatus is a short label for the compact row: why it can't be selected.
 func (u *App) shortStatus(it core.Item) string {
 	switch {
+	case isExclusion(it.Protected):
+		return u.t("short.excluded")
 	case it.Protected != nil:
 		return u.t("short.protected")
 	case it.Status == core.StatusRunning:
@@ -442,10 +475,10 @@ func (u *App) shortStatus(it core.Item) string {
 	}
 }
 
-// plural — ключ для числа: для 1 — тот же ключ с окончанием .one,
-// для остальных чисел — сам ключ.
-// В английском этого хватает; русские тексты написаны так, чтобы
-// форма слова от числа не зависела («объектов: 5»).
+// plural gives the key for a number: for 1 it is the same key with the suffix .one,
+// for other numbers it is the key itself.
+// That is enough for English; the Russian texts are written so that
+// the word form doesn't depend on the number (like "Items: 5" instead of "5 items").
 func plural(key string, n int) string {
 	if n == 1 {
 		return key + ".one"
@@ -453,7 +486,7 @@ func plural(key string, n int) string {
 	return key
 }
 
-// riskPill — цветная «таблетка» риска: зелёная Safe или оранжевая Caution.
+// riskPill is a coloured risk "pill": green Safe or orange Caution.
 func (u *App) riskPill(r core.Risk) fyne.CanvasObject {
 	if r == core.RiskCaution {
 		return pill(u.t("risk.caution"), theme.ColorNameWarning)
@@ -461,7 +494,7 @@ func (u *App) riskPill(r core.Risk) fyne.CanvasObject {
 	return pill(u.t("risk.safe"), theme.ColorNameSuccess)
 }
 
-// itemsOf — объекты одной категории.
+// itemsOf returns the items of one category.
 func itemsOf(items []core.Item, categoryID string) []core.Item {
 	var out []core.Item
 	for _, it := range items {
@@ -472,11 +505,11 @@ func itemsOf(items []core.Item, categoryID string) []core.Item {
 	return out
 }
 
-// setText меняет текст надписи в шапке. Очень длинный (например, текст
-// ошибки) обрезается: надпись не переносится по строкам.
+// setText changes the text of a label in the header. A very long one (for example an
+// error text) is cut off: the label does not wrap onto several lines.
 func setText(t *canvas.Text, s string) {
 	const limit = 140
-	if r := []rune(s); len(r) > limit { // []rune — по символам, а не по байтам (важно для кириллицы)
+	if r := []rune(s); len(r) > limit { // []rune counts by characters, not bytes (matters for Cyrillic)
 		s = string(r[:limit]) + "…"
 	}
 	if t.Text != s {

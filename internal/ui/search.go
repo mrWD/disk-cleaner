@@ -9,30 +9,30 @@ import (
 	"disk-cleaner/internal/core"
 )
 
-// Поиск бывает двух видов:
-//   - глобальный — поле в боковой панели, ищет во всех разделах сразу,
-//     справа показываются результаты, сгруппированные по разделам;
-//   - по разделу — поле над списком открытого раздела, фильтрует его.
+// Search comes in two kinds:
+//   - global: the field in the sidebar, searches all sections at once,
+//     and the results on the right are grouped by section;
+//   - per section: the field above the list of the open section, filters it.
 //
-// «Выбрать все» действует на то, что сейчас видно: с поиском — только
-// на найденное, и, как всегда, только на то, что можно выбрать.
+// "Select All" acts on what is visible right now: with a search, only
+// on what was found, and, as always, only on what can be selected.
 
-// group — категория раздела вместе с её видимыми объектами.
+// group is a section's category together with its visible items.
 type group struct {
 	st    *providerState
 	cat   core.Category
 	items []core.Item
 }
 
-// searching — включён ли глобальный поиск.
+// searching reports whether global search is on.
 func (u *App) searching() bool {
 	return strings.TrimSpace(u.globalQuery) != ""
 }
 
-// matches — подходит ли объект под запрос. Запрос делится на слова, и
-// каждое слово должно найтись где-то в имени, пути или в extra (название
-// категории, раздела). Регистр не важен: "lingary node" найдёт
-// "dual-ai… · node_modules" из ~/Projects/Lingary/….
+// matches reports whether an item fits the query. The query is split into words, and
+// every word must be found somewhere in the name, the path or extra (the name of the
+// category or section). Case doesn't matter: "lingary node" will find
+// "dual-ai… · node_modules" from ~/Projects/Lingary/….
 func matches(it core.Item, query string, extra ...string) bool {
 	words := strings.Fields(strings.ToLower(query))
 	if len(words) == 0 {
@@ -48,8 +48,8 @@ func matches(it core.Item, query string, extra ...string) bool {
 	return true
 }
 
-// groupsOf — видимые категории одного раздела: с объектами, подходящими
-// под запрос. Пока раздел сканируется или с ошибкой — ничего.
+// groupsOf returns the visible categories of one section: those with items that fit
+// the query. While the section is scanning or has an error, nothing.
 func (u *App) groupsOf(st *providerState, query string) []group {
 	if st.scanning || st.err != nil {
 		return nil
@@ -73,7 +73,7 @@ func (u *App) groupsOf(st *providerState, query string) []group {
 	return out
 }
 
-// visibleGroups — всё, что сейчас видно справа.
+// visibleGroups is everything that is visible on the right right now.
 func (u *App) visibleGroups() []group {
 	if u.searching() {
 		var out []group
@@ -89,7 +89,7 @@ func (u *App) visibleGroups() []group {
 	return u.groupsOf(u.states[u.current], u.sectionQuery)
 }
 
-// selectableVisible — видимые объекты, которые можно выбрать.
+// selectableVisible returns the visible items that can be selected.
 func (u *App) selectableVisible() []core.Item {
 	var out []core.Item
 	for _, g := range u.visibleGroups() {
@@ -102,7 +102,7 @@ func (u *App) selectableVisible() []core.Item {
 	return out
 }
 
-// allSelected — выбраны ли уже все из items (и есть ли они вообще).
+// allSelected reports whether all of items are already selected (and whether there are any at all).
 func (u *App) allSelected(items []core.Item) bool {
 	if len(items) == 0 {
 		return false
@@ -115,8 +115,8 @@ func (u *App) allSelected(items []core.Item) bool {
 	return true
 }
 
-// toggleVisibleSelection — кнопка «Выбрать все» в шапке: выбирает всё
-// видимое, что можно выбрать, а если всё уже выбрано — снимает отметки.
+// toggleVisibleSelection is the "Select All" button in the header: it selects everything
+// visible that can be selected, and if everything is already selected, it clears the marks.
 func (u *App) toggleVisibleSelection() {
 	items := u.selectableVisible()
 
@@ -126,7 +126,7 @@ func (u *App) toggleVisibleSelection() {
 		}
 	} else {
 		for _, it := range items {
-			_ = u.sel.Add(it) // ошибки быть не может: только то, что можно выбрать
+			_ = u.sel.Add(it) // there can be no error: only what can be selected
 		}
 	}
 
@@ -134,19 +134,19 @@ func (u *App) toggleVisibleSelection() {
 	u.updateBottom()
 }
 
-// setGlobalQuery меняет глобальный запрос и перерисовывает список и
-// боковую панель. Поле ввода при этом не пересоздаётся — фокус не теряется.
+// setGlobalQuery changes the global query and redraws the list and
+// the sidebar. The input field is not recreated, so focus is not lost.
 func (u *App) setGlobalQuery(q string) {
 	if q == u.globalQuery {
 		return
 	}
 	u.globalQuery = q
-	u.detailsScroll = nil // новые результаты — с начала
+	u.detailsScroll = nil // new results start from the top
 	u.fillSidebar()
 	u.refreshDetails()
 }
 
-// setSectionQuery меняет запрос по открытому разделу.
+// setSectionQuery changes the query for the open section.
 func (u *App) setSectionQuery(q string) {
 	if q == u.sectionQuery {
 		return
@@ -156,8 +156,8 @@ func (u *App) setSectionQuery(q string) {
 	u.refreshDetails()
 }
 
-// searchField — поле поиска в стиле macOS: подсказка внутри и крестик
-// справа, который появляется, когда что-то введено.
+// searchField is a macOS-style search field: a hint inside and a cross
+// on the right that appears when something is typed.
 func searchField(placeholder, value string, onChange func(string)) *widget.Entry {
 	e := widget.NewEntry()
 	e.SetPlaceHolder(placeholder)

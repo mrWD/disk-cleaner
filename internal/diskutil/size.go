@@ -11,34 +11,34 @@ import (
 	"disk-cleaner/internal/core"
 )
 
-// DirSize — сколько места на диске занимает path (папка или файл).
+// DirSize is how much disk space path (a folder or a file) takes up.
 //
-// Что важно:
-//   - Считаются реально занятые блоки диска (как у du), а не «логический»
-//     размер файлов: именно столько место и освободится.
-//   - Обход не уходит на другие файловые системы. Иначе, как у du
-//     08.11.2026, в размер попадёт содержимое смонтированных образов
-//     или подключённого iPhone (DeviceFS показывал фантомные 60 ГБ).
-//   - Символические ссылки не раскрываются: ссылка — это сама ссылка.
-//   - Жёсткие ссылки на один файл (их делает pnpm) считаются один раз.
-//   - Папки, которые не удалось прочитать, пропускаются.
+// What matters:
+//   - The disk blocks actually used are counted (like du does), not the "logical"
+//     size of the files: that is exactly how much space will be freed.
+//   - The walk doesn't cross into other file systems. Otherwise, as with du
+//     on 08.11.2026, the size would include the contents of mounted images
+//     or a connected iPhone (DeviceFS showed a phantom 60 GB).
+//   - Symbolic links are not followed: a link is just the link itself.
+//   - Hard links to one file (pnpm makes them) are counted once.
+//   - Folders that can't be read are skipped.
 func DirSize(ctx context.Context, path string) (core.Bytes, error) {
-	// Lstat, а не Stat: если path — ссылка, берём саму ссылку, не цель.
+	// Lstat, not Stat: if path is a link, we take the link itself, not its target.
 	rootInfo, err := os.Lstat(path)
 	if err != nil {
 		return 0, err
 	}
 
-	// info.Sys() — «сырые» данные системы. .(*syscall.Stat_t) — проверка
-	// типа: «если внутри Stat_t, дай его, ok = true».
+	// info.Sys() is the system's "raw" data. .(*syscall.Stat_t) is a type
+	// check: "if there is a Stat_t inside, give it to me, ok = true".
 	rootStat, ok := rootInfo.Sys().(*syscall.Stat_t)
 	if !ok {
 		return core.Bytes(rootInfo.Size()), nil
 	}
-	device := rootStat.Dev // номер файловой системы, на которой лежит path
+	device := rootStat.Dev // number of the file system that path lives on
 
-	// Ключ для учёта жёстких ссылок: файл однозначно задаётся
-	// номером устройства и номером inode.
+	// Key for tracking hard links: a file is uniquely identified
+	// by the device number and the inode number.
 	type inode struct {
 		dev int64
 		ino uint64
@@ -48,19 +48,19 @@ func DirSize(ctx context.Context, path string) (core.Bytes, error) {
 	var total int64
 	visited := 0
 
-	// WalkDir обходит дерево и для каждого элемента вызывает нашу функцию.
+	// WalkDir walks the tree and calls our function for every entry.
 	walkErr := filepath.WalkDir(path, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
-			// Нет доступа к папке или файл исчез во время обхода:
-			// пропускаем этот элемент, но обход продолжаем.
+			// No access to the folder, or the file vanished during the walk:
+			// we skip this entry but keep walking.
 			return nil
 		}
 
-		// Раз в несколько тысяч файлов проверяем, не отменили ли сканирование.
+		// Once every few thousand files we check whether the scan was cancelled.
 		visited++
 		if visited%4096 == 0 {
 			if err := ctx.Err(); err != nil {
-				return err // любая ошибка из функции останавливает WalkDir
+				return err // any error returned from the function stops WalkDir
 			}
 		}
 
@@ -75,15 +75,15 @@ func DirSize(ctx context.Context, path string) (core.Bytes, error) {
 			return nil
 		}
 
-		// Другая файловая система — туда не заходим.
+		// A different file system: we don't go in there.
 		if st.Dev != device {
 			if d.IsDir() {
-				return fs.SkipDir // специальная «ошибка»: пропустить папку целиком
+				return fs.SkipDir // a special "error": skip the whole folder
 			}
 			return nil
 		}
 
-		// Файл с несколькими жёсткими ссылками считаем только при первой встрече.
+		// A file with several hard links is counted only the first time we meet it.
 		if !d.IsDir() && st.Nlink > 1 {
 			key := inode{dev: int64(st.Dev), ino: st.Ino}
 			if seen[key] {
@@ -92,7 +92,7 @@ func DirSize(ctx context.Context, path string) (core.Bytes, error) {
 			seen[key] = true
 		}
 
-		// Blocks — сколько блоков по 512 байт занято на диске.
+		// Blocks is how many 512-byte blocks are used on disk.
 		total += st.Blocks * 512
 		return nil
 	})
@@ -104,36 +104,36 @@ func DirSize(ctx context.Context, path string) (core.Bytes, error) {
 	return core.Bytes(total), nil
 }
 
-// SizeAll считает размеры нескольких путей параллельно и возвращает их
-// в том же порядке. Если путь не удалось посчитать — его размер 0.
+// SizeAll measures several paths in parallel and returns the sizes
+// in the same order. If a path can't be measured, its size is 0.
 //
-// Как это устроено (горутины — лёгкие потоки Go):
-//   - на каждый путь запускаем горутину (go func() {...}());
-//   - канал sem размером workers работает как «турникет»: одновременно
-//     считают не больше workers горутин, чтобы не завалить диск;
-//   - WaitGroup ждёт, пока все горутины закончат.
+// How it works (goroutines are Go's lightweight threads):
+//   - we start a goroutine for each path (go func() {...}());
+//   - the sem channel of size workers acts as a "turnstile": no more than
+//     workers goroutines measure at the same time, so the disk isn't swamped;
+//   - the WaitGroup waits until all the goroutines are done.
 func SizeAll(ctx context.Context, paths []string, workers int) []core.Bytes {
 	if workers < 1 {
 		workers = 1
 	}
 
 	sizes := make([]core.Bytes, len(paths))
-	sem := make(chan struct{}, workers) // буферизованный канал на workers мест
+	sem := make(chan struct{}, workers) // a buffered channel with room for workers entries
 	var wg sync.WaitGroup
 
 	for i, p := range paths {
 		wg.Add(1)
 
 		go func() {
-			defer wg.Done() // defer — выполнится при выходе из функции, даже при ошибке
+			defer wg.Done() // defer runs when the function exits, even on an error
 
-			sem <- struct{}{}        // занять место (ждём, если все заняты)
-			defer func() { <-sem }() // освободить место в конце
+			sem <- struct{}{}        // take a slot (wait if all are taken)
+			defer func() { <-sem }() // release the slot at the end
 
 			size, err := DirSize(ctx, p)
 			if err == nil {
-				// Каждая горутина пишет только в свою ячейку sizes[i],
-				// поэтому они не мешают друг другу.
+				// Each goroutine writes only to its own cell sizes[i],
+				// so they don't get in each other's way.
 				sizes[i] = size
 			}
 		}()

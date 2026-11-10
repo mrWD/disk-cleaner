@@ -6,20 +6,20 @@ import (
 	"fmt"
 )
 
-// Plan — что именно будет сделано. Его показывают пользователю ДО
-// выполнения: каждую команду и каждый путь.
+// Plan is exactly what is going to be done. It is shown to the user BEFORE
+// anything runs: every command and every path.
 type Plan struct {
 	Steps []PlanStep
 }
 
-// PlanStep — часть плана одного провайдера.
+// PlanStep is the part of the plan that belongs to one provider.
 type PlanStep struct {
 	Provider Provider
-	Items    []Item   // что удаляем
-	Actions  []Action // как именно
+	Items    []Item   // what we delete
+	Actions  []Action // how exactly
 }
 
-// Total — сколько места освободится по плану.
+// Total is how much space the plan will free.
 func (p Plan) Total() Bytes {
 	var total Bytes
 	for _, step := range p.Steps {
@@ -30,16 +30,16 @@ func (p Plan) Total() Bytes {
 	return total
 }
 
-// Actions — все действия плана по порядку.
+// Actions returns all the actions of the plan, in order.
 func (p Plan) Actions() []Action {
 	var out []Action
 	for _, step := range p.Steps {
-		out = append(out, step.Actions...) // ... — «развернуть срез в аргументы»
+		out = append(out, step.Actions...) // ... means "spread the slice into arguments"
 	}
 	return out
 }
 
-// NeedsAdmin — понадобится ли пароль администратора.
+// NeedsAdmin tells whether the administrator password will be needed.
 func (p Plan) NeedsAdmin() bool {
 	for _, a := range p.Actions() {
 		if a.NeedsAdmin {
@@ -49,8 +49,8 @@ func (p Plan) NeedsAdmin() bool {
 	return false
 }
 
-// UsesTrash — переносит ли план что-то в Корзину (тогда место освободится
-// только после её очистки, и это надо сказать пользователю).
+// UsesTrash tells whether the plan moves anything to the Trash (then the space
+// is freed only after the Trash is emptied, and the user must be told so).
 func (p Plan) UsesTrash() bool {
 	for _, a := range p.Actions() {
 		if a.Trash {
@@ -60,23 +60,23 @@ func (p Plan) UsesTrash() bool {
 	return false
 }
 
-// ErrEmptyPlan — провайдер не вернул ни одного действия для объектов.
-// Так быть не должно: значит, в провайдере ошибка.
+// ErrEmptyPlan means the provider returned no actions for the items.
+// That must never happen: it means there is a bug in the provider.
 var ErrEmptyPlan = errors.New("provider returned no actions")
 
-// BuildPlan — единственный путь от галочек к действиям.
+// BuildPlan is the only path from checkmarks to actions.
 //
-// Для каждого провайдера берём его отмеченные объекты и спрашиваем,
-// что с ними сделать. Каждый объект ещё раз проверяется правилом
-// CanSelect: защита в глубину на случай, если что-то запрещённое
-// всё-таки оказалось в выборе.
+// For each provider we take its selected items and ask what to do
+// with them. Every item is checked once more with the CanSelect rule:
+// defence in depth, in case something forbidden still ended up
+// in the selection.
 func BuildPlan(sel *Selection, providers []Provider) (Plan, error) {
 	var plan Plan
 
 	for _, p := range providers {
 		items := sel.ItemsFor(p)
 		if len(items) == 0 {
-			continue // continue — сразу к следующему провайдеру
+			continue // continue jumps straight to the next provider
 		}
 
 		for _, it := range items {
@@ -99,20 +99,20 @@ func BuildPlan(sel *Selection, providers []Provider) (Plan, error) {
 	return plan, nil
 }
 
-// Progress — сообщение о ходе выполнения плана.
+// Progress is a message about how far the plan has got.
 type Progress struct {
-	Done   int    // сколько действий уже выполнено (включая это)
-	Total  int    // сколько всего
-	Action Action // какое действие только что выполнилось
-	Err    error  // его ошибка; nil — успешно
+	Done   int    // how many actions are done (including this one)
+	Total  int    // how many in total
+	Action Action // which action just finished
+	Err    error  // its error; nil means success
 }
 
-// Execute выполняет план по одному действию и после каждого сообщает
-// о прогрессе через onProgress.
+// Execute runs the plan one action at a time and reports progress
+// through onProgress after each one.
 //
-// Ошибка одного действия не останавливает остальные (одна упрямая папка
-// не должна мешать почистить всё остальное) — все ошибки вернутся списком.
-// Отмена через ctx останавливает выполнение перед следующим действием.
+// An error in one action doesn't stop the others (one stubborn folder
+// must not prevent cleaning everything else); all the errors are returned as a list.
+// Cancelling through ctx stops the run before the next action.
 func Execute(ctx context.Context, plan Plan, ex Executor, onProgress func(Progress)) []error {
 	actions := plan.Actions()
 	var errs []error

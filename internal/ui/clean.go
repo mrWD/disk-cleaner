@@ -16,7 +16,7 @@ import (
 	"disk-cleaner/internal/diskutil"
 )
 
-// providers — все провайдеры в порядке списка слева.
+// providers lists all providers in the order of the list on the left.
 func (u *App) providers() []core.Provider {
 	out := make([]core.Provider, len(u.states))
 	for i, st := range u.states {
@@ -25,14 +25,14 @@ func (u *App) providers() []core.Provider {
 	return out
 }
 
-// reviewAndClean — кнопка «Проверить и очистить»: план для отмеченного.
+// reviewAndClean is the "Review & Clean…" button: a plan for what is selected.
 func (u *App) reviewAndClean() {
 	u.review(u.sel, "")
 }
 
-// safeItems — что из раздела можно удалить, не раздумывая: объекты из
-// категорий Safe, которые можно выбрать (не запущены, не заняты, не
-// защищены). Пока раздел сканируется или с ошибкой — ничего.
+// safeItems is what in a section can be deleted without a second thought: items from
+// Safe categories that can be selected (not running, not busy, not
+// protected). While the section is scanning or has an error, nothing.
 func safeItems(st *providerState) []core.Item {
 	if st.scanning || st.err != nil {
 		return nil
@@ -41,7 +41,7 @@ func safeItems(st *providerState) []core.Item {
 	var out []core.Item
 	for _, cat := range st.provider.Categories() {
 		if cat.Risk != core.RiskSafe {
-			continue // «Осторожно» — только если человек отметит сам
+			continue // "Caution" only if the person selects it themselves
 		}
 		for _, it := range itemsOf(st.items, cat.ID) {
 			if ok, _ := it.CanSelect(); ok {
@@ -52,21 +52,21 @@ func safeItems(st *providerState) []core.Item {
 	return out
 }
 
-// safeSelection — отдельный выбор из всего безопасного в разделах states.
-// Отдельный, а не u.sel: галочки на экране кнопка «Очистить всё» не трогает,
-// и если в окне проверки нажать «Отмена», всё останется как было.
+// safeSelection is a separate selection of everything safe in the sections states.
+// Separate, not u.sel: the "Clean All Safe" button doesn't touch the checkmarks on screen,
+// and if you press "Cancel" in the review window, everything stays as it was.
 func (u *App) safeSelection(states ...*providerState) *core.Selection {
 	sel := core.NewSelection()
 	for _, st := range states {
 		for _, it := range safeItems(st) {
-			_ = sel.Add(it) // ошибки быть не может: safeItems отдаёт только то, что можно выбрать
+			_ = sel.Add(it) // there can be no error: safeItems returns only what can be selected
 		}
 	}
 	return sel
 }
 
-// cleanAll — кнопки «Очистить всё»: в разделе (один state) или во всех.
-// Удаляет не сразу: сначала то же окно проверки со списком команд.
+// cleanAll handles the "Clean All Safe" buttons: in one section (a single state) or in all of them.
+// It doesn't delete right away: first the same review window with the list of commands.
 func (u *App) cleanAll(states ...*providerState) {
 	sel := u.safeSelection(states...)
 	if sel.Len() == 0 {
@@ -75,10 +75,28 @@ func (u *App) cleanAll(states ...*providerState) {
 	u.review(sel, u.t("confirm.safe_only"))
 }
 
-// review строит план для sel и показывает его ДО выполнения:
-// каждую команду и каждый путь, ровно как они будут выполнены.
-// note — пояснение под первой строкой (у «Очистить всё» — что входит).
+// review builds the plan for sel and shows it BEFORE it runs:
+// every command and every path, exactly as they will be executed.
+// note is an explanation under the first line (for "Clean All Safe" it says what is included).
 func (u *App) review(sel *core.Selection, note string) {
+	var notes []string
+	if note != "" {
+		notes = append(notes, note)
+	}
+
+	// The administrator password is turned off in Settings: leave out what needs it.
+	if !u.opts.Settings.AllowAdmin() {
+		var skipped int
+		sel, skipped = u.withoutAdmin(sel)
+		if sel.Len() == 0 {
+			dialog.ShowInformation(u.t("error.title"), u.t("admin.all_skipped"), u.win)
+			return
+		}
+		if skipped > 0 {
+			notes = append(notes, u.t(plural("admin.skipped", skipped), map[string]any{"Count": skipped}))
+		}
+	}
+
 	plan, err := core.BuildPlan(sel, u.providers())
 	if err != nil {
 		dialog.ShowInformation(u.t("error.title"), u.errText(err), u.win)
@@ -90,8 +108,8 @@ func (u *App) review(sel *core.Selection, note string) {
 		"Count": len(actions),
 		"Size":  plan.Total().String(),
 	}), true))
-	if note != "" {
-		content.Add(secondary(note, true))
+	for _, n := range notes {
+		content.Add(secondary(n, true))
 	}
 
 	for _, step := range plan.Steps {
@@ -104,9 +122,9 @@ func (u *App) review(sel *core.Selection, note string) {
 			lines[i] = a.String()
 		}
 		commands := widget.NewLabelWithStyle(strings.Join(lines, "\n"), fyne.TextAlignLeading, fyne.TextStyle{Monospace: true})
-		commands.Selectable = true // можно выделить и скопировать в терминал
+		commands.Selectable = true // can be selected and copied into a terminal
 
-		// Команды — в отдельном блоке, как код в документации Apple.
+		// Commands go in a separate block, like code in Apple's documentation.
 		box := canvas.NewRectangle(theme.Color(colorCode))
 		box.CornerRadius = 8
 		content.Add(container.NewStack(box, commands))
@@ -119,7 +137,7 @@ func (u *App) review(sel *core.Selection, note string) {
 		content.Add(colored(u.t("confirm.dry_run"), theme.ColorNameWarning))
 	}
 
-	// Scroll — в обе стороны: команды бывают длинными.
+	// Scroll in both directions: commands can be long.
 	scroll := container.NewScroll(content)
 	scroll.SetMinSize(fyne.NewSize(760, 420))
 
@@ -132,20 +150,20 @@ func (u *App) review(sel *core.Selection, note string) {
 	d.Show()
 }
 
-// dryRun — исполнитель для режима «только показать»: ничего не делает,
-// только немного ждёт, чтобы был виден прогресс.
+// dryRun is the executor for dry run mode: it does nothing,
+// it only waits a little so that progress is visible.
 type dryRun struct{}
 
 func (dryRun) Run(ctx context.Context, _ core.Action) error {
 	select {
-	case <-time.After(150 * time.Millisecond): // подождать 150 мс…
+	case <-time.After(150 * time.Millisecond): // wait 150 ms...
 		return nil
-	case <-ctx.Done(): // …или выйти сразу, если нажали «Стоп»
+	case <-ctx.Done(): // ...or leave at once if "Stop" was pressed
 		return ctx.Err()
 	}
 }
 
-// execute выполняет план в фоне, показывая прогресс, а потом итог.
+// execute runs the plan in the background, showing progress, and then the result.
 func (u *App) execute(plan core.Plan) {
 	freeBefore, _, _ := diskutil.FreeSpace("/")
 
@@ -173,7 +191,7 @@ func (u *App) execute(plan core.Plan) {
 				status.SetText(p.Action.String())
 			})
 		})
-		cancel() // освободить ресурсы контекста
+		cancel() // release the context's resources
 
 		fyne.Do(func() {
 			progress.Hide()
@@ -181,7 +199,7 @@ func (u *App) execute(plan core.Plan) {
 			freeAfter, _, _ := diskutil.FreeSpace("/")
 			u.showResult(plan, errs, freeAfter-freeBefore, dry)
 
-			// Пересканировать то, что чистили: показать, что осталось.
+			// Rescan what was cleaned: show what is left.
 			u.sel.Clear()
 			for _, step := range plan.Steps {
 				for _, st := range u.states {
@@ -190,19 +208,19 @@ func (u *App) execute(plan core.Plan) {
 					}
 				}
 			}
-			u.fillDisk() // обновить свободное место и полосу диска
+			u.fillDisk() // update the free space and the disk bar
 		})
 	}()
 }
 
-// showResult — итог: сколько освободилось или какие действия не удались.
+// showResult shows the result: how much was freed or which actions failed.
 func (u *App) showResult(plan core.Plan, errs []error, freed core.Bytes, dry bool) {
 	if len(errs) == 0 {
 		msg := u.t("result.ok", map[string]any{"Freed": max(freed, 0).String(), "Planned": plan.Total().String()})
 		if dry {
 			msg = u.t("result.dry_run")
 		} else if plan.UsesTrash() {
-			// Файлы из «Загрузок» лежат в Корзине — место ещё не освободилось.
+			// Files from Downloads are in the Trash, so the space is not freed yet.
 			msg += "\n\n" + u.t("result.trash_note")
 		}
 		dialog.ShowInformation(u.t("result.title"), msg, u.win)

@@ -1,15 +1,15 @@
 //go:build screenshots
 
-// Инструмент, а не обычный тест: снимки всех экранов приложения на реальных
-// данных этого Mac, без открытия окна (Fyne умеет рисовать «в памяти»).
-// Обычный go test его пропускает из-за строки go:build выше.
+// A tool, not an ordinary test: screenshots of all the app's screens on this Mac's
+// real data, without opening a window (Fyne can draw "in memory").
+// The ordinary go test skips it because of the go:build line above.
 //
-// Запуск из корня проекта (картинки появятся в папке screenshots/):
+// Run from the project root (the images appear in the screenshots/ folder):
 //
 //	go test -tags screenshots -run TestScreenshots ./internal/ui/ -args -lang=ru -dark
 //
-// Тест импортирует провайдеры — это можно только в тестах: сам пакет ui
-// о провайдерах не знает.
+// The test imports the providers, which is only allowed in tests: the ui package
+// itself knows nothing about providers.
 package ui
 
 import (
@@ -41,18 +41,18 @@ import (
 )
 
 var (
-	shotLang = flag.String("lang", "en", "язык интерфейса: en или ru")
-	shotDir  = flag.String("out", "../../screenshots", "куда сохранить картинки")
-	shotDark = flag.Bool("dark", false, "снимать в тёмном виде")
+	shotLang = flag.String("lang", "en", "interface language: en or ru")
+	shotDir  = flag.String("out", "../../screenshots", "where to save the images")
+	shotDark = flag.Bool("dark", false, "take the screenshots in the dark look")
 )
 
-// frozen — провайдер, чьё сканирование в фоне никогда не заканчивается.
-// Результаты мы получаем заранее и подставляем сами: так фоновые горутины
-// не мешают снимать экраны.
+// frozen is a provider whose background scan never finishes.
+// We get the results beforehand and put them in ourselves: this way background goroutines
+// don't get in the way of taking the screenshots.
 type frozen struct{ core.Provider }
 
-// Look передаёт значок и цвет настоящего провайдера: встроенный интерфейс
-// даёт только методы core.Provider, а Look в него не входит.
+// Look passes on the icon and colour of the real provider: the embedded interface
+// gives only the core.Provider methods, and Look is not one of them.
 func (f frozen) Look() ([]byte, string) {
 	if l, ok := f.Provider.(core.Look); ok {
 		return l.Look()
@@ -61,7 +61,7 @@ func (f frozen) Look() ([]byte, string) {
 }
 
 func (frozen) Scan(ctx context.Context) ([]core.Item, error) {
-	<-ctx.Done() // ждать вечно (контекст фоновый и не отменяется)
+	<-ctx.Done() // wait forever (the context is a background one and is never cancelled)
 	return nil, ctx.Err()
 }
 
@@ -73,15 +73,16 @@ func TestScreenshots(t *testing.T) {
 	a := test.NewTempApp(t)
 	store := settings.New(a.Preferences(), kit.Home())
 	store.SetLanguage(*shotLang)
+	store.SetPermissionsAsked(true) // the first-launch window is captured separately at the end
 	ex, _ := executor.New()
 
 	real := []core.Provider{
 		worktrees.New(store.Roots), projects.New(store.Roots), xcode.New(), simulators.New(),
 		android.New(), docker.New(), models.New(), devtools.New(),
-		packagecaches.New(), appcaches.New(), downloads.New(),
+		packagecaches.New(), appcaches.New(), downloads.New(store.UseDownloads),
 	}
 
-	// Настоящее сканирование — заранее и по очереди.
+	// Real scanning, beforehand and one provider after another.
 	type result struct {
 		items []core.Item
 		err   error
@@ -102,7 +103,7 @@ func TestScreenshots(t *testing.T) {
 		st.scanning, st.items, st.err = false, results[i].items, results[i].err
 	}
 	if *shotDark {
-		u.applyAppearance(appearanceDark) // так же, как плитка «Тёмное» в настройках
+		u.applyAppearance(appearanceDark) // the same as the "Dark" tile in settings
 	}
 	u.win.Resize(fyne.NewSize(1180, 780))
 	u.render()
@@ -122,13 +123,13 @@ func TestScreenshots(t *testing.T) {
 		}
 	}
 
-	// По снимку на каждого провайдера.
+	// One screenshot per provider.
 	for i, st := range u.states {
 		u.selectProvider(i)
 		save(st.provider.ID())
 	}
 
-	// Развёрнутая категория: объяснения и подробности.
+	// An expanded category: explanations and details.
 	u.selectProvider(0)
 	if cats := u.states[0].provider.Categories(); len(cats) > 0 {
 		u.expanded[cats[0].ID] = true
@@ -137,7 +138,7 @@ func TestScreenshots(t *testing.T) {
 		u.expanded[cats[0].ID] = false
 	}
 
-	// Поиск в разделе и глобальный поиск.
+	// Search in a section and global search.
 	u.setSectionQuery("lingary")
 	u.relayout()
 	save("section-search")
@@ -146,12 +147,12 @@ func TestScreenshots(t *testing.T) {
 	save("global-search")
 	u.searchEntry.SetText("")
 
-	// Настройки с выбором оформления; потом закрываем окно настроек.
+	// Settings with the appearance choice; then we close the settings window.
 	u.showSettings()
 	save("settings")
 	u.win.Canvas().Overlays().Remove(u.win.Canvas().Overlays().Top())
 
-	// Окно подтверждения: выбираем до трёх объектов первого провайдера.
+	// The confirmation window: we select up to three items of the first provider.
 	u.selectProvider(0)
 	for _, it := range u.states[0].items {
 		if ok, _ := it.CanSelect(); ok && u.sel.Len() < 3 {
@@ -163,7 +164,12 @@ func TestScreenshots(t *testing.T) {
 	save("confirm")
 	u.win.Canvas().Overlays().Remove(u.win.Canvas().Overlays().Top())
 
-	// Окно проверки от кнопки «Очистить всё» в боковой панели.
+	// The review window from the "Clean All Safe" button in the sidebar.
 	u.cleanAll(u.states...)
 	save("clean-all")
+	u.win.Canvas().Overlays().Remove(u.win.Canvas().Overlays().Top())
+
+	// The first-launch window about permissions.
+	u.showIntro()
+	save("intro")
 }

@@ -2,18 +2,18 @@ package core
 
 import "testing"
 
-// Сценарии в стиле BDD: Given (дано) → When (когда) → Then (тогда).
-// Имя каждого сценария — фраза о поведении, её видно в go test -v.
+// Scenarios in BDD style: Given → When → Then.
+// The name of each scenario is a phrase about behaviour, visible in go test -v.
 func TestItemCanSelect(t *testing.T) {
 	cases := []struct {
 		scenario string
-		given    Item   // Given: такой объект
-		wantOK   bool   // Then: можно ли его выбрать
-		wantWhy  string // Then: ключ причины, если нельзя ("" — причины нет)
+		given    Item   // Given: this item
+		wantOK   bool   // Then: can it be selected
+		wantWhy  string // Then: the reason key if not ("" means no reason)
 	}{
 		{
 			scenario: "idle cache can be selected",
-			given:    Item{Name: "DerivedData"}, // Status не указан = StatusIdle
+			given:    Item{Name: "DerivedData"}, // Status not set = StatusIdle
 			wantOK:   true,
 		},
 		{
@@ -27,7 +27,7 @@ func TestItemCanSelect(t *testing.T) {
 			wantWhy:  ReasonInUse,
 		},
 		{
-			// Реальный случай 08.11.2026: три записи iOS 27.0 с одним образом.
+			// A real case from 08.11.2026: three iOS 27.0 entries sharing one image.
 			scenario: "runtime sharing an image with the active one is protected",
 			given: Item{
 				Name: "iOS 27.0 (unusable copy)",
@@ -65,11 +65,11 @@ func TestItemCanSelect(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.scenario, func(t *testing.T) {
-			// When: спрашиваем ядро, можно ли выбрать объект
+			// When: we ask the core whether the item can be selected
 			ok, why := c.given.CanSelect()
 
-			// Then: ответ совпадает с ожидаемым.
-			// Fatalf останавливает сценарий: если ok не тот, причину проверять бессмысленно.
+			// Then: the answer matches the expected one.
+			// Fatalf stops the scenario: if ok is wrong, checking the reason is pointless.
 			if ok != c.wantOK {
 				t.Fatalf("CanSelect() ok = %v, want %v", ok, c.wantOK)
 			}
@@ -78,7 +78,7 @@ func TestItemCanSelect(t *testing.T) {
 			if why != nil {
 				gotWhy = why.Key
 			}
-			// Errorf отмечает провал, но даёт сценарию дойти до конца.
+			// Errorf marks a failure but lets the scenario run to the end.
 			if gotWhy != c.wantWhy {
 				t.Errorf("reason = %q, want %q", gotWhy, c.wantWhy)
 			}

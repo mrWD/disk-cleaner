@@ -9,8 +9,8 @@ import (
 	"disk-cleaner/internal/providers/providertest"
 )
 
-// fakeHome создаёт временную «домашнюю папку» с файлами Xcode
-// и возвращает провайдер, который смотрит в неё.
+// fakeHome creates a temporary "home folder" with Xcode files
+// and returns a provider that looks into it.
 func fakeHome(t *testing.T, folders ...string) *Provider {
 	t.Helper()
 	home := t.TempDir()
@@ -32,7 +32,7 @@ func TestScan(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("finds Xcode folders and names them for people", func(t *testing.T) {
-		// Given: домашняя папка с типичными файлами Xcode
+		// Given: a home folder with typical Xcode files
 		p := fakeHome(t,
 			"DerivedData/Lingary-bxqjcmhlwrsvdyfkqlfxonbsnjcn",
 			"DerivedData/ModuleCache.noindex",
@@ -47,7 +47,7 @@ func TestScan(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// Then: каждая папка стала объектом своей категории с понятным именем
+		// Then: every folder became an item of its own category with a readable name
 		want := map[string]string{
 			"Lingary":                        catDerivedData,
 			"ModuleCache.noindex":            catDerivedData,

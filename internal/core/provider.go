@@ -5,40 +5,40 @@ import (
 	"embed"
 )
 
-// Provider — один источник мусора: Xcode, Docker, кэши npm…
-// Каждый живёт в своей папке internal/providers/<имя> и знает только core.
+// Provider is one source of junk: Xcode, Docker, npm caches…
+// Each lives in its own folder internal/providers/<name> and knows only core.
 //
-// Provider ничего не удаляет сам. Он находит объекты (Scan)
-// и описывает, что сделать, чтобы их удалить (Plan).
-// Выполняет действия Executor — после того как пользователь
-// увидел план и подтвердил.
+// A Provider deletes nothing itself. It finds items (Scan)
+// and describes what to do to delete them (Plan).
+// The Executor runs the actions, after the user
+// has seen the plan and confirmed it.
 //
-// interface в Go — это список методов. Любой тип, у которого
-// есть все эти методы, автоматически считается Provider.
+// An interface in Go is a list of methods. Any type that has
+// all these methods is automatically a Provider.
 type Provider interface {
-	// ID — короткое имя: "xcode". С него начинаются ID категорий.
+	// ID is a short name: "xcode". Category IDs start with it.
 	ID() string
 
-	// Categories — что этот провайдер умеет находить.
+	// Categories is what this provider knows how to find.
 	Categories() []Category
 
-	// Scan ищет объекты прямо сейчас. Может занять время
-	// (посчитать размер папок, спросить docker), поэтому принимает ctx:
-	// через него сканирование можно отменить или ограничить по времени.
+	// Scan looks for items right now. It can take a while
+	// (measuring folder sizes, asking docker), so it takes a ctx:
+	// through it the scan can be cancelled or given a time limit.
 	Scan(ctx context.Context) ([]Item, error)
 
-	// Plan говорит, что сделать, чтобы удалить эти объекты.
-	// Сам ничего не выполняет.
+	// Plan says what to do to delete these items.
+	// It runs nothing itself.
 	Plan(items []Item) ([]Action, error)
 
-	// Translations — тексты провайдера: файлы translations/en.json и т.д.,
-	// вшитые в программу при сборке (embed).
+	// Translations is the provider's texts: translations/en.json files and so on,
+	// baked into the program at build time (embed).
 	Translations() embed.FS
 }
 
-// Executor выполняет действия. В core — только интерфейс (порт).
-// Настоящая реализация будет в internal/executor, а в тестах — фейк,
-// который ничего не удаляет, а только запоминает, что его попросили.
+// Executor runs actions. In core there is only the interface (a port).
+// The real implementation lives in internal/executor, and tests use a fake
+// that deletes nothing and only remembers what it was asked to do.
 type Executor interface {
 	Run(ctx context.Context, a Action) error
 }

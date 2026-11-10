@@ -16,7 +16,7 @@ func TestActionString(t *testing.T) {
 		{
 			scenario: "path with spaces is quoted",
 			given:    Action{RemovePath: "/Users/viktor/Library/Application Support/Code/Cache"},
-			// `...` — «сырая» строка: внутри можно писать " без экранирования
+			// `...` is a "raw" string: you can write " inside without escaping
 			want: `rm -rf "/Users/viktor/Library/Application Support/Code/Cache"`,
 		},
 		{
@@ -38,10 +38,10 @@ func TestActionString(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.scenario, func(t *testing.T) {
-			// When: показываем действие пользователю
+			// When: we show the action to the user
 			got := c.given.String()
 
-			// Then: строка ровно такая, как в терминале
+			// Then: the string is exactly what a terminal would show
 			if got != c.want {
 				t.Errorf("String() =\n  %s\nwant\n  %s", got, c.want)
 			}

@@ -13,16 +13,16 @@ import (
 	"disk-cleaner/internal/core"
 )
 
-// sidebarWidth — ширина боковой панели, как в Finder.
+// sidebarWidth is the width of the sidebar, like in Finder.
 const sidebarWidth = 270
 
-// buildSidebar — боковая панель сверху вниз:
-//   - значок и имя приложения;
-//   - поле поиска по всем разделам (как в Системных настройках);
-//   - строки разделов с цветными значками — они прокручиваются, если
-//     окно низкое;
-//   - внизу плашка диска: сколько свободно и кнопка «Очистить всё» (disk.go),
-//     а под ней кнопки «Пересканировать» и «Настройки».
+// buildSidebar builds the sidebar from top to bottom:
+//   - the app icon and name;
+//   - a search field over all sections (like in System Settings);
+//   - section rows with coloured icons; they scroll if
+//     the window is short;
+//   - at the bottom, the disk card: how much is free and the "Clean All Safe" button (disk.go),
+//     and under it the "Rescan" and "Settings" buttons.
 func (u *App) buildSidebar() fyne.CanvasObject {
 	u.sidebarRows = container.NewVBox()
 	u.disk = container.NewVBox()
@@ -40,12 +40,12 @@ func (u *App) buildSidebar() fyne.CanvasObject {
 		gap(0, 4),
 		u.searchEntry,
 		gap(0, 4),
-		// Снизу отступ: строки разделов лежат в отдельной прокрутке, и
-		// VBox свой промежуток между подписью и ними уже не добавляет.
+		// Space below: the section rows live in a separate scroll area, and
+		// the VBox no longer adds its own gap between the caption and them.
 		pad(0, 6, 8, 0, section),
 	)
 
-	// Внизу панели: плашка диска и под ней плоские кнопки, как в панели инструментов.
+	// At the bottom of the panel: the disk card and under it flat buttons, like in a toolbar.
 	rescan := widget.NewButtonWithIcon(u.t("button.rescan"), theme.ViewRefreshIcon(), u.scanAll)
 	rescan.Importance = widget.LowImportance
 	openSettings := widget.NewButtonWithIcon(u.t("button.settings"), theme.SettingsIcon(), u.showSettings)
@@ -55,8 +55,8 @@ func (u *App) buildSidebar() fyne.CanvasObject {
 		pad(4, 0, 0, 0, container.NewHBox(rescan, layout.NewSpacer(), openSettings)),
 	)
 
-	// edges: шапка сверху, диск и кнопки снизу, а строки разделов занимают всё,
-	// что осталось, и прокручиваются, если не помещаются.
+	// edges: the header on top, the disk and buttons at the bottom, and the section rows take everything
+	// that is left and scroll if they don't fit.
 	list := edges(top, footer, nil, nil, container.NewVScroll(u.sidebarRows))
 
 	bg := canvas.NewRectangle(theme.Color(colorSidebar))
@@ -70,7 +70,7 @@ func (u *App) buildSidebar() fyne.CanvasObject {
 	)
 }
 
-// fillSidebar перестраивает строки разделов (их всего несколько — дёшево).
+// fillSidebar rebuilds the section rows (there are only a few of them, so it is cheap).
 func (u *App) fillSidebar() {
 	if u.sidebarRows == nil {
 		return
@@ -83,9 +83,9 @@ func (u *App) fillSidebar() {
 	u.sidebarRows.Refresh()
 }
 
-// sidebarRow — одна строка: значок, имя, справа размер или состояние.
-// Во время поиска справа — сколько найдено в разделе, а разделы без
-// совпадений приглушены.
+// sidebarRow is one row: an icon, a name, and on the right the size or the state.
+// During a search the right side shows how much was found in the section, and sections with
+// no matches are dimmed.
 func (u *App) sidebarRow(i int, st *providerState) fyne.CanvasObject {
 	icon, tint := u.look(st.provider)
 	selected := i == u.current && !u.searching()
@@ -117,7 +117,7 @@ func (u *App) sidebarRow(i int, st *providerState) fyne.CanvasObject {
 		container.NewCenter(status),
 	))
 
-	// Выбранная строка — на скруглённой подложке.
+	// The selected row sits on a rounded backing.
 	var content fyne.CanvasObject = row
 	if selected {
 		bg := canvas.NewRectangle(theme.Color(theme.ColorNameSelection))
@@ -128,25 +128,25 @@ func (u *App) sidebarRow(i int, st *providerState) fyne.CanvasObject {
 	return newTappable(content, func() { u.openSection(i) })
 }
 
-// openSection открывает раздел: выходит из глобального поиска (если он
-// был) и выбирает раздел слева.
+// openSection opens a section: it leaves the global search (if it
+// was on) and selects the section on the left.
 func (u *App) openSection(i int) {
 	if u.searching() {
 		u.globalQuery = ""
-		u.searchEntry.SetText("") // поле очистится, повторный вызов setGlobalQuery ничего не сделает
+		u.searchEntry.SetText("") // the field gets cleared, and the repeated setGlobalQuery call will do nothing
 	}
 	u.selectProvider(i)
 }
 
-// selectProvider выбирает раздел слева.
+// selectProvider selects a section on the left.
 func (u *App) selectProvider(i int) {
 	u.current = i
-	u.detailsScroll = nil // новый раздел — с начала
+	u.detailsScroll = nil // a new section starts from the top
 	u.fillSidebar()
 	u.refreshDetails()
 }
 
-// statusText — что написать справа от имени раздела.
+// statusText is what to write to the right of the section name.
 func (u *App) statusText(st *providerState) string {
 	switch {
 	case st.scanning:
@@ -158,12 +158,12 @@ func (u *App) statusText(st *providerState) string {
 	case len(st.items) == 0:
 		return u.t("status.empty")
 	case total(st.items) == 0:
-		return u.t("status.protected_only") // что-то нашлось, но всё защищено
+		return u.t("status.protected_only") // something was found, but all of it is protected
 	}
 	return total(st.items).String()
 }
 
-// isUnavailable — провайдер не ошибся, а просто сейчас недоступен.
+// isUnavailable: the provider did not fail, it is just unavailable right now.
 func isUnavailable(err error) bool {
 	var u *core.UnavailableError
 	return errors.As(err, &u)
