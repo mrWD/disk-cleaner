@@ -184,8 +184,9 @@ func (u *App) scanning(st *providerState) fyne.CanvasObject {
 	v.live = live
 	v.live.Hide()
 
+	// Center keeps it in the middle of whatever space the section has.
 	stack := container.NewStack(v.orbit, v.live)
-	v.root = pad(36, 0, 0, 0, stack)
+	v.root = container.NewCenter(stack)
 
 	// The paths fade from the newest (full grey) to the oldest (faint).
 	grey := theme.Color(colorSecondary)
@@ -197,13 +198,13 @@ func (u *App) scanning(st *providerState) fyne.CanvasObject {
 				v.nowAt.Text = shortPath(recent[0])
 			}
 			v.nowAt.Refresh()
+			v.root.Refresh() // a longer path is wider: centre it again
 			return
 		}
 
 		if !v.live.Visible() { // the first thing was measured: switch views
 			v.orbit.Hide()
 			v.live.Show()
-			stack.Refresh()
 		}
 		v.total.Text = measured.String()
 		v.total.Refresh()
@@ -215,6 +216,7 @@ func (u *App) scanning(st *providerState) fyne.CanvasObject {
 			p.Color = withAlpha(grey, uint8(255-i*55))
 			p.Refresh()
 		}
+		v.root.Refresh() // new text has a new width and height: centre it again
 	}
 
 	// One clock for the ring and the text: eight steps a second is smooth for

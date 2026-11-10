@@ -66,6 +66,15 @@ func (u *App) refreshDetails() {
 	}
 	u.updateTop()
 
+	// A section that is scanning shows its scan view in the middle of the
+	// free space. There's nothing to scroll yet, so it goes in without a scroll.
+	if st := u.states[u.current]; !u.searching() && st.scanning {
+		u.detailsScroll = nil
+		u.list.Objects = []fyne.CanvasObject{u.scanning(st)}
+		u.list.Refresh()
+		return
+	}
+
 	var offset fyne.Position
 	if u.detailsScroll != nil {
 		offset = u.detailsScroll.Offset
