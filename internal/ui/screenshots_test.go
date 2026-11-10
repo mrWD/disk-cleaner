@@ -169,6 +169,18 @@ func TestScreenshots(t *testing.T) {
 	save("clean-all")
 	u.win.Canvas().Overlays().Remove(u.win.Canvas().Overlays().Top())
 
+	// A locked item (on the Never clean list): the first item of the last
+	// section that has any, locked with its row's lock and unlocked again.
+	for i := len(u.states) - 1; i >= 0; i-- {
+		if items := u.states[i].items; len(items) > 0 {
+			u.selectProvider(i)
+			u.addExclusions(items[0])
+			save("locked")
+			u.allowCleaning(u.states[i].items[0])
+			break
+		}
+	}
+
 	// The first-launch window about permissions.
 	u.showIntro()
 	save("intro")

@@ -550,6 +550,27 @@ func TestNeverClean(t *testing.T) {
 		}
 	})
 
+	t.Run("the lock works for a running item that can't be ticked", func(t *testing.T) {
+		// Given: redis is running, so its checkbox is disabled
+		u := loaded(t)
+
+		// When: its lock is clicked
+		u.addExclusions(byID(u, redis.ID))
+
+		// Then: it's on the list and shows that reason
+		if got := byID(u, redis.ID); !isExclusion(got.Protected) {
+			t.Errorf("redis protection = %+v, want Never clean", got.Protected)
+		}
+
+		// When: the lock is clicked again
+		u.allowCleaning(byID(u, redis.ID))
+
+		// Then: it's back to being just Running
+		if _, why := byID(u, redis.ID).CanSelect(); why == nil || why.Key != core.ReasonRunning {
+			t.Errorf("redis reason = %+v, want running", why)
+		}
+	})
+
 	t.Run("a provider's own protection is kept", func(t *testing.T) {
 		u := loaded(t)
 		own := core.Item{ID: "p1", CategoryID: "xcode.cache", Name: "provider protected", Protected: &core.Reason{Key: "core.reason.in_use"}}

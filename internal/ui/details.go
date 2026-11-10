@@ -435,6 +435,7 @@ func (u *App) itemRow(it core.Item, expanded bool) fyne.CanvasObject {
 		right.Add(pill(u.shortStatus(it), theme.ColorNameWarning))
 	}
 	right.Add(container.NewCenter(text(it.Size.String(), theme.SizeNameText, colorSecondary, false)))
+	right.Add(u.lockControl(it)) // Never clean on / off, see never.go
 
 	if !expanded {
 		return container.NewBorder(nil, nil, check, right, pad(0, 0, 6, 6, secondary(it.Detail, false)))
