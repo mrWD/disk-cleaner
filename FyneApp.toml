@@ -3,4 +3,4 @@ Icon = "Icon.png"
 Name = "Disk Cleaner"
 ID = "io.github.mrwd.diskcleaner"
 Version = "0.1.0"
-Build = 23
+Build = 24

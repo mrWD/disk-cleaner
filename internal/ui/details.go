@@ -233,7 +233,7 @@ func (u *App) subtitleText() string {
 // buildSection builds the list of the open section: the category cards.
 func (u *App) buildSection(st *providerState) fyne.CanvasObject {
 	if st.scanning {
-		return u.skeleton(st) // the same object on every rebuild, so it never restarts
+		return u.scanning(st) // the same object on every rebuild, so it never restarts
 	}
 
 	groups := u.groupsOf(st, u.sectionQuery)

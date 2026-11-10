@@ -17,7 +17,7 @@
 //	search.go      - search over all sections and over the open section, "Select All"
 //	bottom.go      - the bottom strip: what is selected, Never Clean, Review & Clean…
 //	scan.go        - scanning in the background
-//	animation.go   - the spinner and skeleton cards shown while a section scans
+//	animation.go   - what moves while a section scans: spinner, ring, live progress
 //	clean.go       - the plan, confirmation and execution; "Clean All Safe"
 //	never.go       - the "Never clean" list
 //	permissions.go - permissions and the setup window shown before the first scan
@@ -75,10 +75,12 @@ type providerState struct {
 	items    []core.Item
 	err      error
 
-	// While scanning: the sidebar spinner, the skeleton cards and their
-	// animations, kept across window rebuilds (see animation.go).
+	// While scanning: what the scan has reported, the sidebar spinner, the
+	// section's scan view and their animations, kept across window rebuilds
+	// (see animation.go).
+	progress *scanProgress
 	spinner  fyne.CanvasObject
-	skeleton fyne.CanvasObject
+	view     *scanView
 	anims    []*fyne.Animation
 }
 

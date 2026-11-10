@@ -113,5 +113,7 @@
   "folders.find": "Find Project Folders",
   "folders.finding": "Looking for folders with git repositories…",
   "folders.found_none": "No folders with git repositories were found in your home folder. Add the folders where you keep your code.",
-  "setup.folders.hint": "Disk Cleaner looks for git repositories and worktrees in these folders. Below are the folders with git repositories found on your Mac: remove any that aren't projects, or add more."
+  "setup.folders.hint": "Disk Cleaner looks for git repositories and worktrees in these folders. Below are the folders with git repositories found on your Mac: remove any that aren't projects, or add more.",
+  "scan.nothing_yet": "Nothing found yet",
+  "scan.measured": "measured so far"
 }

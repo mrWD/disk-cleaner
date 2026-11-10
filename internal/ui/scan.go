@@ -31,10 +31,15 @@ func (u *App) scan(st *providerState) {
 	gen := st.gen // remember this scan's number
 	st.scanning = true
 	st.err = nil
+
+	// The scan reports what it's measuring through its context (core.Reporter);
+	// the section shows that while it runs. A new scan starts from zero.
+	st.progress = &scanProgress{}
+	ctx := core.WithReporter(context.Background(), st.progress)
 	u.refresh()
 
 	go func() {
-		items, err := st.provider.Scan(context.Background())
+		items, err := st.provider.Scan(ctx)
 
 		fyne.Do(func() { u.finishScan(st, gen, items, err) })
 	}()

@@ -705,17 +705,47 @@ func TestScanAnimation(t *testing.T) {
 		docker := u.states[1]
 		docker.scanning = true
 		u.selectProvider(1)
-		spinner, skeleton := docker.spinner, docker.skeleton
-		if spinner == nil || skeleton == nil {
-			t.Fatal("a scanning section should show a spinner in the sidebar and skeleton cards")
+		spinner, view := docker.spinner, docker.view
+		if spinner == nil || view == nil {
+			t.Fatal("a scanning section should show a spinner in the sidebar and its scan view")
 		}
 
 		// When: another section finishes and the window is rebuilt
 		u.finishScan(u.states[0], u.states[0].gen, []core.Item{derived}, nil)
 
 		// Then: still the very same objects
-		if docker.spinner != spinner || docker.skeleton != skeleton {
-			t.Error("spinner and skeleton were made anew, so their animation would start over")
+		if docker.spinner != spinner || docker.view != view {
+			t.Error("spinner and scan view were made anew, so their animation would start over")
+		}
+	})
+
+	t.Run("the ring shows until something is measured, then live progress", func(t *testing.T) {
+		// Given: docker is scanning, nothing measured yet
+		u := loaded(t)
+		docker := u.states[1]
+		docker.scanning = true
+		docker.progress = &scanProgress{}
+		u.selectProvider(1)
+		docker.progress.Looking("/Users/me/.docker/build")
+		docker.view.update()
+
+		// Then: the ring, with the folder being looked at under it
+		if !docker.view.orbit.Visible() || docker.view.live.Visible() || docker.view.nowAt.Text == "" {
+			t.Errorf("before anything is measured: orbit %v, live %v, now at %q",
+				docker.view.orbit.Visible(), docker.view.live.Visible(), docker.view.nowAt.Text)
+		}
+
+		// When: a folder of 5 MB is measured, then the next one is looked at
+		docker.progress.Measured("/Users/me/.docker/build", 5_000_000)
+		docker.progress.Looking("/Users/me/.docker/volumes")
+		docker.view.update()
+
+		// Then: the live view with the total, newest folder first
+		if docker.view.orbit.Visible() || !docker.view.live.Visible() || docker.view.total.Text != "5.0 MB" {
+			t.Errorf("after 5 MB: orbit %v, live %v, total %q", docker.view.orbit.Visible(), docker.view.live.Visible(), docker.view.total.Text)
+		}
+		if got := docker.view.paths[0].Text; got != "/Users/me/.docker/volumes" {
+			t.Errorf("newest path = %q", got)
 		}
 	})
 
@@ -727,7 +757,7 @@ func TestScanAnimation(t *testing.T) {
 
 		u.finishScan(docker, docker.gen, []core.Item{postgres}, nil)
 
-		if docker.spinner != nil || docker.skeleton != nil || len(docker.anims) != 0 {
+		if docker.spinner != nil || docker.view != nil || len(docker.anims) != 0 {
 			t.Error("animations should stop and be forgotten when the scan ends")
 		}
 		mustShow(t, u, "postgres:17")

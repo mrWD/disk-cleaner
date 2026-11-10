@@ -22,12 +22,22 @@ import (
 //   - Symbolic links are not followed: a link is just the link itself.
 //   - Hard links to one file (pnpm makes them) are counted once.
 //   - Folders that can't be read are skipped.
-func DirSize(ctx context.Context, path string) (core.Bytes, error) {
+func DirSize(ctx context.Context, path string) (size core.Bytes, err error) {
 	// Lstat, not Stat: if path is a link, we take the link itself, not its target.
 	rootInfo, err := os.Lstat(path)
 	if err != nil {
 		return 0, err
 	}
+
+	// Tell the scan's Reporter, if there is one, what we're measuring and,
+	// when done, how big it was: the window shows it while the scan runs.
+	// Only for paths that exist: sections try many places that usually don't.
+	core.ReportLooking(ctx, path)
+	defer func() {
+		if err == nil {
+			core.ReportMeasured(ctx, path, size)
+		}
+	}()
 
 	// info.Sys() is the system's "raw" data. .(*syscall.Stat_t) is a type
 	// check: "if there is a Stat_t inside, give it to me, ok = true".

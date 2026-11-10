@@ -86,6 +86,7 @@ func (p *Provider) Scan(ctx context.Context) ([]core.Item, error) {
 	}
 
 	for _, root := range roots {
+		core.ReportLooking(ctx, root) // the window shows where we're looking for repositories
 		for _, repo := range gitscan.FindRepos(root) {
 			if repo.Kind != gitscan.Main {
 				continue // a worktree: it belongs to the worktrees provider

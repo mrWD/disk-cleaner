@@ -134,13 +134,25 @@ func TestScreenshots(t *testing.T) {
 	}
 
 	// Scanning: the first two sections pretend to be still scanning, to show
-	// the sidebar spinners and the skeleton cards; then their results come back.
+	// the sidebar spinners, the ring (nothing found yet) and live progress;
+	// then their results come back.
+	home := kit.Home()
 	for _, st := range u.states[:2] {
 		st.scanning = true
+		st.progress = &scanProgress{}
 	}
-	u.selectProvider(1)
-	u.relayout()
-	save("scanning")
+	u.states[0].progress.Looking(filepath.Join(home, "Projects"))
+	for _, p := range []string{"Projects/Lingary/node_modules", "Projects/Lingary/ios/Pods", "Projects/courses/.expo", "Projects/remote-desktop/build"} {
+		u.states[1].progress.Looking(filepath.Join(home, p))
+	}
+	u.states[1].progress.Measured("", 812_400_000)
+	u.refresh()
+	for i, name := range []string{"scanning-orbit", "scanning-live"} {
+		u.selectProvider(i)
+		u.states[i].view.update()
+		u.relayout()
+		save(name)
+	}
 	for _, st := range u.states[:2] {
 		st.scanning = false
 		st.stopAnimations()

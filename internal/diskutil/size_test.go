@@ -131,3 +131,30 @@ func TestSizeAll(t *testing.T) {
 		}
 	})
 }
+
+// reports remembers what DirSize told the scan's Reporter.
+type reports struct {
+	looking  []string
+	measured core.Bytes
+}
+
+func (r *reports) Looking(path string)                   { r.looking = append(r.looking, path) }
+func (r *reports) Measured(path string, size core.Bytes) { r.measured += size }
+
+func TestDirSizeReportsProgress(t *testing.T) {
+	// Given: a folder with a file, and a scan context with a Reporter
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "a.bin"), make([]byte, 10_000), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r := &reports{}
+	ctx := core.WithReporter(context.Background(), r)
+
+	// When
+	size, err := DirSize(ctx, dir)
+
+	// Then: it said which folder it measured, and the same size it returned
+	if err != nil || len(r.looking) != 1 || r.looking[0] != dir || r.measured != size || size == 0 {
+		t.Errorf("size = %v, err = %v, reported %+v", size, err, r)
+	}
+}
